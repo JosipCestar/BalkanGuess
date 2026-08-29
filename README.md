@@ -5,19 +5,32 @@ A small, one-song-per-day Balkan music guessing game. Visitors hear an increasin
 ## Architecture
 
 - Next.js route handlers keep Prisma and SoundCloud secrets server-side.
-- SQLite/Prisma stores `Song` and one optional `DailySong` assignment per `YYYY-MM-DD`. A stable date hash selects an active song if no explicit assignment exists.
+- PostgreSQL/Prisma stores `Song` and one optional `DailySong` assignment per `YYYY-MM-DD`. A stable date hash selects an active song if no explicit assignment exists.
 - `lib/soundcloud` implements current SoundCloud Client Credentials OAuth: credentials are sent only through HTTP Basic authentication, tokens are cached in-process, refreshed before expiry, and API errors/rate limits become clear player errors.
 - `AudioProvider` keeps the game independent of SoundCloud. Replace `SoundCloudAudioProvider` with a licensed storage/provider implementation without changing gameplay.
 - Browser localStorage (`balkanguess:<date>`) holds only progress: attempts, guesses, skips, and completed result.
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and set `DATABASE_URL="file:./dev.db"`.
+Requires Node.js 20.9 or newer and PostgreSQL.
+
+1. Copy `.env.example` to `.env` and set `DATABASE_URL` to a PostgreSQL connection string.
 2. Install dependencies with `npm install`.
 3. Run `npm run db:generate`, `npm run db:migrate -- --name init`, then `npm run db:seed`.
 4. Run `npm run dev`, visit `http://localhost:3000`.
 
 Run checks with `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build`.
+
+## Deploy to Railway
+
+1. Create a Railway project and add a PostgreSQL service.
+2. Deploy this repository as a Next.js service.
+3. Add a reference variable named `DATABASE_URL` that points to the PostgreSQL service's `DATABASE_URL`.
+4. Add `SOUNDCLOUD_CLIENT_ID` and `SOUNDCLOUD_CLIENT_SECRET` as private service variables.
+5. Set the pre-deploy command to `npm run db:deploy && npm run db:seed`.
+6. Set the healthcheck path to `/api/health`, deploy, and generate a public domain under Networking.
+
+The seed is idempotent, so it is safe to run after every migration. Never commit `.env` or paste SoundCloud credentials into Railway build logs.
 
 ## SoundCloud development setup
 

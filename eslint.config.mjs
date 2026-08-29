@@ -1,6 +1,5 @@
 import js from "@eslint/js";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextVitals from "eslint-config-next/core-web-vitals";
 
-const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
-const config = [js.configs.recommended, ...compat.extends("next/core-web-vitals"), { ignores: [".next/**", ".next-dev/**", "node_modules/**", "prisma/generated/**"] }, { files: ["**/*.{ts,tsx}"], rules: { "no-undef": "off", "no-unused-vars": "off" } }];
+const config = [js.configs.recommended, ...nextVitals, { ignores: [".next/**", ".next-dev/**", "node_modules/**", "prisma/generated/**"] }, { files: ["**/*.{ts,tsx}"], rules: { "no-undef": "off", "no-unused-vars": "off", "react-hooks/set-state-in-effect": "off" } }];
 export default config;

@@ -1,0 +1,4 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getDailySong } from "@/lib/daily";
+import { getCurrentChallengeDate } from "@/lib/challenge";
+export async function POST(request: NextRequest) { try { const body = await request.json() as { date?: string; guessedSongId?: number }; if (body.date !== getCurrentChallengeDate() || !Number.isInteger(body.guessedSongId)) return NextResponse.json({ error: "Invalid daily guess." }, { status: 400 }); const daily = await getDailySong(body.date); if (!daily) return NextResponse.json({ error: "No songs configured." }, { status: 503 }); const correct = daily.id === body.guessedSongId; return NextResponse.json(correct ? { correct, answer: { artist: daily.artist, title: daily.title, soundcloudUrl: daily.soundcloudUrl } } : { correct }); } catch { return NextResponse.json({ error: "Could not validate guess." }, { status: 400 }); } }

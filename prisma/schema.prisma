@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Song {
+  id                Int       @id @default(autoincrement())
+  title             String
+  artist            String
+  normalizedTitle   String
+  normalizedArtist  String
+  releaseYear       Int?
+  country           String?
+  genre             String?
+  soundcloudTrackId String?
+  soundcloudUrl     String?
+  previewStart      Float     @default(0)
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  dailySongs        DailySong[]
+  @@index([active])
+}
+
+model DailySong {
+  id     Int    @id @default(autoincrement())
+  date   String @unique
+  songId Int
+  song   Song   @relation(fields: [songId], references: [id], onDelete: Restrict)
+}

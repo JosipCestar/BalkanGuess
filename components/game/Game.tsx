@@ -7,7 +7,7 @@ import { DURATIONS, scoreForAttempt } from "@/lib/game";
 
 type Song = { id: number; artist: string; title: string };
 type Answer = { artist: string; title: string; soundcloudUrl?: string | null };
-type Entry = { type: "wrong" | "skip" | "correct"; song?: Song };
+type Entry = { type: "wrong" | "skip" | "artist" | "correct"; song?: Song };
 type Saved = {
   attempt: number;
   guesses: number[];
@@ -137,7 +137,8 @@ export function Game() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not validate guess.");
-      consume({ type: data.correct ? "correct" : "wrong", song: selected }, data.answer);
+      const type: Entry["type"] = data.correct ? "correct" : data.artistMatch ? "artist" : "wrong";
+      consume({ type, song: selected }, data.answer);
       setQuery("");
       setSelected(undefined);
       setResults([]);
@@ -151,7 +152,7 @@ export function Game() {
   const share = async () => {
     const cells = Array.from({ length: 6 }, (_, index) => {
       const entry = game.entries[index];
-      return entry?.type === "correct" ? "🟩" : entry?.type === "wrong" ? "🟥" : entry?.type === "skip" ? "⬛" : "⬜";
+      return entry?.type === "correct" ? "🟩" : entry?.type === "artist" ? "🟨" : entry?.type === "wrong" ? "🟥" : entry?.type === "skip" ? "⬛" : "⬜";
     }).join("");
     const text = `BalkanGuess #${number}\n\n${cells}\n\n${game.won ? `${scoreForAttempt(game.attempt - 1)} points` : "No score"}`;
     try {
@@ -227,12 +228,13 @@ export function Game() {
         <div className="attempts" aria-label="Attempts">
           {Array.from({ length: 6 }, (_, index) => {
             const entry = game.entries[index];
-            const className = entry?.type === "skip" ? "skip" : entry?.type === "correct" ? "win" : entry ? "used" : "";
-            return <div key={index} className={`attempt ${className}`}>{entry?.type === "skip" ? "SKIP" : entry?.type === "correct" ? "✓" : entry ? "×" : index + 1}</div>;
+            const className = entry?.type === "skip" ? "skip" : entry?.type === "correct" ? "win" : entry?.type === "artist" ? "artist" : entry ? "used" : "";
+            const label = entry?.type === "artist" ? "Correct artist, wrong song" : undefined;
+            return <div key={index} className={`attempt ${className}`} title={label} aria-label={label}>{entry?.type === "skip" ? "SKIP" : entry?.type === "correct" ? "✓" : entry?.type === "artist" ? "≈" : entry ? "×" : index + 1}</div>;
           })}
         </div>
         <ul className="history">
-          {game.entries.map((entry, index) => <li key={index}>{entry.type === "skip" ? "⬛ Skipped" : entry.type === "correct" ? `✓ ${entry.song?.artist} – ${entry.song?.title}` : `✕ ${entry.song?.artist} – ${entry.song?.title}`}</li>)}
+          {game.entries.map((entry, index) => <li key={index} className={entry.type}>{entry.type === "skip" ? "⬛ Skipped" : entry.type === "correct" ? `✓ ${entry.song?.artist} – ${entry.song?.title}` : entry.type === "artist" ? `🟨 Artist match · ${entry.song?.artist} – ${entry.song?.title}` : `✕ ${entry.song?.artist} – ${entry.song?.title}`}</li>)}
         </ul>
         {game.completed && game.answer && !resultOpen && <button className="secondary show-result" onClick={() => setResultOpen(true)}>SHOW RESULT</button>}
       </div>

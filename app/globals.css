@@ -11,6 +11,7 @@
   --text: #f7f7f5;
   --muted: #979797;
   --accent: #ff5c35;
+  --hint: #f5b942;
   --danger: #ff6b6b;
 }
 
@@ -256,12 +257,14 @@ input:focus { border-color: #606060; background: #0b0b0b; }
 }
 
 .attempt.used { border-color: #5c3333; color: var(--danger); }
+.attempt.artist { border-color: #9c6a19; background: rgb(245 185 66 / 12%); color: var(--hint); }
 .attempt.skip { color: #aaa; background: #171717; }
 .attempt.win { border-color: var(--accent); background: rgb(255 92 53 / 12%); color: var(--accent); }
 
 .history { margin: 18px 0 0; padding: 0; list-style: none; }
 .history:empty { display: none; }
 .history li { padding: 10px 2px; border-bottom: 1px solid var(--border); color: #c8c8c8; font-size: .86rem; }
+.history li.artist { color: #ffd277; }
 
 .error {
   margin: 16px 0 0;

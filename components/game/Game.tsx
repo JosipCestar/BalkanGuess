@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { AudioPlayer } from "./AudioPlayer";
 import { DURATIONS, scoreForAttempt } from "@/lib/game";
+import type { DailyStats } from "@/lib/daily-stats";
 
 type Song = { id: number; artist: string; title: string };
 type Answer = { artist: string; title: string; soundcloudUrl?: string | null };
@@ -19,9 +20,38 @@ type Saved = {
 
 const empty: Saved = { attempt: 0, guesses: [], entries: [], completed: false, won: false };
 
-function ResultDialog({ game, number, onClose, onShare }: {
+function DailyStatsPanel({ stats, loading }: { stats?: DailyStats; loading: boolean }) {
+  if (loading) return <section className="daily-stats" aria-live="polite"><p className="muted">Loading today’s results…</p></section>;
+  if (!stats) return null;
+
+  const percentage = (count: number) => stats.totalPlayers ? `${Math.max((count / stats.totalPlayers) * 100, count ? 3 : 0)}%` : "0%";
+
+  return <section className="daily-stats" aria-labelledby="daily-stats-title">
+    <div className="daily-stats-heading">
+      <h3 id="daily-stats-title">Today’s players</h3>
+      <p><strong>{stats.solvedPlayers}</strong> of <strong>{stats.totalPlayers}</strong> solved</p>
+    </div>
+    <div className="stats-chart" aria-label="Completed rounds by attempt">
+      {stats.attempts.map((count, index) => <div className="stat-row" key={index} aria-label={`${count} players solved on attempt ${index + 1}`}>
+        <span>{index + 1}</span>
+        <span className="stat-track"><span className="stat-fill" style={{ width: percentage(count) }} /></span>
+        <strong>{count}</strong>
+      </div>)}
+      <div className="stat-row loss" aria-label={`${stats.losses} players did not solve today’s song`}>
+        <span>×</span>
+        <span className="stat-track"><span className="stat-fill" style={{ width: percentage(stats.losses) }} /></span>
+        <strong>{stats.losses}</strong>
+      </div>
+    </div>
+    <p className="stats-caption">Attempt number · completed players</p>
+  </section>;
+}
+
+function ResultDialog({ game, number, stats, statsLoading, onClose, onShare }: {
   game: Saved;
   number?: number;
+  stats?: DailyStats;
+  statsLoading: boolean;
   onClose: () => void;
   onShare: () => void;
 }) {
@@ -38,6 +68,7 @@ function ResultDialog({ game, number, onClose, onShare }: {
       <p className="song-answer">{answer.title}</p>
       <p className="muted">by {answer.artist}</p>
       {game.won && <p><strong>{scoreForAttempt(game.attempt - 1)} points</strong></p>}
+      <DailyStatsPanel stats={stats} loading={statsLoading} />
       {embedUrl && <iframe
         className="soundcloud-embed"
         title={`${answer.title} by ${answer.artist} on SoundCloud`}
@@ -67,6 +98,8 @@ export function Game() {
   const [highlight, setHighlight] = useState(-1);
   const [error, setError] = useState("");
   const [resultOpen, setResultOpen] = useState(false);
+  const [stats, setStats] = useState<DailyStats>();
+  const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/daily").then(response => response.json()).then(data => {
@@ -95,6 +128,25 @@ export function Game() {
   useEffect(() => {
     if (game.completed && game.answer) setResultOpen(true);
   }, [game.completed, game.answer]);
+
+  useEffect(() => {
+    if (!date || !game.completed) return;
+    setStatsLoading(true);
+    let playerId = localStorage.getItem("balkanguess:player-id");
+    if (!playerId) {
+      playerId = crypto.randomUUID();
+      localStorage.setItem("balkanguess:player-id", playerId);
+    }
+
+    fetch("/api/daily/stats", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date, playerId, won: game.won, attempt: game.attempt }),
+    }).then(response => {
+      if (!response.ok) throw new Error("Could not load stats.");
+      return response.json();
+    }).then(setStats).catch(() => undefined).finally(() => setStatsLoading(false));
+  }, [date, game.completed, game.won, game.attempt]);
 
   useEffect(() => {
     if (!query.trim()) { setResults([]); return; }
@@ -239,6 +291,6 @@ export function Game() {
         {game.completed && game.answer && !resultOpen && <button className="secondary show-result" onClick={() => setResultOpen(true)}>SHOW RESULT</button>}
       </div>
     </section>
-    {game.completed && resultOpen && <ResultDialog game={game} number={number} onClose={() => setResultOpen(false)} onShare={() => void share()} />}
+    {game.completed && resultOpen && <ResultDialog game={game} number={number} stats={stats} statsLoading={statsLoading} onClose={() => setResultOpen(false)} onShare={() => void share()} />}
   </>;
 }

@@ -31,3 +31,15 @@ model DailySong {
   songId Int
   song   Song   @relation(fields: [songId], references: [id], onDelete: Restrict)
 }
+
+model DailyResult {
+  id         Int      @id @default(autoincrement())
+  date       String
+  playerHash String
+  won        Boolean
+  attempt    Int
+  createdAt  DateTime @default(now())
+
+  @@unique([date, playerHash])
+  @@index([date])
+}

@@ -4,6 +4,7 @@ import { canConsumeAttempt, durationForAttempt, scoreForAttempt } from "../lib/g
 import { normalizeBalkanText } from "../lib/text";
 import { getSnippetEnd, hasReachedSnippetEnd, withActualPlaybackStart } from "../lib/audio/snippet";
 import { haveMatchingArtistCredit, parseArtistCredits } from "../lib/artist";
+import { isValidCompletedResult, summarizeDailyResults } from "../lib/daily-stats";
 describe("Balkan text normalization", () => { it("normalizes diacritics and punctuation", () => { expect(normalizeBalkanText(" Željko Joksimović ")).toBe("zeljko joksimovic"); expect(normalizeBalkanText("Đurđevdan")).toBe("djurdjevdan"); }); });
 describe("artist credit matching", () => {
   it("parses the collaboration styles used by the song catalog", () => {
@@ -20,6 +21,21 @@ describe("artist credit matching", () => {
 });
 describe("daily challenge", () => { it("uses Zagreb date instead of browser offset", () => { expect(getCurrentChallengeDate(new Date("2026-08-28T22:30:00.000Z"))).toBe("2026-08-29"); }); it("chooses deterministic fallback", () => { expect(stableIndex("2026-08-29", 10)).toBe(stableIndex("2026-08-29", 10)); }); });
 describe("game scoring and attempts", () => { it("progresses predictably", () => { expect(durationForAttempt(0)).toBe(1); expect(durationForAttempt(5)).toBe(16); expect(scoreForAttempt(0)).toBe(1000); expect(scoreForAttempt(5)).toBe(100); expect(canConsumeAttempt(5, false)).toBe(true); expect(canConsumeAttempt(6, false)).toBe(false); }); });
+describe("daily player statistics", () => {
+  it("summarizes wins by attempt and losses", () => {
+    expect(summarizeDailyResults([
+      { won: true, attempt: 1, count: 2 },
+      { won: true, attempt: 4, count: 3 },
+      { won: false, attempt: 6, count: 1 },
+    ])).toEqual({ totalPlayers: 6, solvedPlayers: 5, attempts: [2, 0, 0, 3, 0, 0], losses: 1 });
+  });
+  it("accepts only completed round results", () => {
+    expect(isValidCompletedResult(true, 1)).toBe(true);
+    expect(isValidCompletedResult(false, 6)).toBe(true);
+    expect(isValidCompletedResult(false, 5)).toBe(false);
+    expect(isValidCompletedResult(true, 7)).toBe(false);
+  });
+});
 describe("snippet boundaries", () => {
   it("stops at the configured media-time boundary", () => {
     expect(getSnippetEnd(30, 1)).toBe(31);

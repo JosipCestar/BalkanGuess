@@ -304,6 +304,29 @@ input:focus { border-color: #606060; background: #0b0b0b; }
 .dialog .song-answer + .muted { margin-top: 6px; }
 .dialog .actions { margin-top: 20px; }
 
+.daily-stats {
+  margin: 22px 0 4px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #0d0d0d;
+  text-align: left;
+}
+
+.daily-stats > .muted { margin: 0; text-align: center; font-size: .82rem; }
+.daily-stats-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 13px; }
+.daily-stats-heading h3 { margin: 0; font-size: .9rem; letter-spacing: -.015em; }
+.daily-stats-heading p { margin: 0; color: var(--muted); font-size: .72rem; }
+.daily-stats-heading strong { color: var(--text); }
+
+.stats-chart { display: grid; gap: 6px; }
+.stat-row { display: grid; grid-template-columns: 14px 1fr 24px; align-items: center; gap: 9px; color: #aaa; font-size: .7rem; }
+.stat-row > strong { color: #ddd; text-align: right; font-variant-numeric: tabular-nums; }
+.stat-track { height: 6px; overflow: hidden; border-radius: 99px; background: #252525; }
+.stat-fill { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.stat-row.loss .stat-fill { background: #656565; }
+.stats-caption { margin: 10px 0 0; color: #686868; font-size: .62rem; letter-spacing: .04em; text-align: right; }
+
 .soundcloud-embed {
   display: block;
   margin: 20px 0 12px;

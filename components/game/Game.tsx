@@ -231,13 +231,17 @@ export function Game() {
   return <>
     <section className="game" aria-label="BalkanGuess daily game">
       <header className="masthead">
-        <div>
-          <div className="eyebrow">one daily Balkan song</div>
-          <h1>BalkanGuess<span aria-hidden="true">.</span></h1>
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden="true"><span>BG</span></div>
+          <div>
+            <div className="eyebrow">Balkan daily drop</div>
+            <h1>Balkan<span>Guess</span><i aria-hidden="true">.</i></h1>
+          </div>
         </div>
-        <p className="daily-number">#{number ?? "…"}</p>
+        <p className="daily-number"><span>EP</span> #{number ?? "…"}</p>
       </header>
       <div className="card">
+        <div className="card-kicker"><span>Mystery track</span><span>6 tries</span></div>
         <div className="mystery" aria-label="Hidden song title">?????</div>
         <p className="muted">Attempt {Math.min(game.attempt + 1, 6)} of 6 · {duration} second snippet</p>
         <AudioPlayer duration={duration} disabled={!date || game.completed} onError={setError} />

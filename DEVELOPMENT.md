@@ -2,7 +2,7 @@
 
 Run `npm run db:generate` once after installing dependencies, then `npm run dev:playlist`.
 Open http://127.0.0.1:3001. This explicitly enables a local JSON catalog instead of database queries.
-Your existing `.env` and Railway database are not modified. Shared statistics are disabled in this preview;
+Your existing `.env` and production database are not modified. Shared statistics are disabled in this preview;
 attempts persist in the browser independently for each category and date.
 
 The local catalog uses Balkan Club Mix as the main challenge, with Jala i Buba and EXYU as secondary categories.

@@ -40,6 +40,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes ffmpeg pipx
           pipx install "yt-dlp[default]"
+          pipx inject yt-dlp "bgutil-ytdlp-pot-provider==2.0.0"
+          docker run --name bgutil-provider --detach --init --rm \
+            --publish 127.0.0.1:4416:4416 \
+            brainicism/bgutil-ytdlp-pot-provider:2.0.0
 
       - name: Apply database migrations
         run: npm run db:deploy

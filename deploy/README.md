@@ -31,6 +31,8 @@ R2_BUCKET_NAME
 
 Set `R2_BUCKET_NAME` to `balkanguess-audio`. The workflow in `.github/workflows/daily-playlist.yml` runs at 02:17 UTC and can also be started manually. It refreshes the three playlists, prepares seven Zagreb calendar days, uploads new clips, and publishes the matching rows to Supabase.
 
+The job runs a pinned local BgUtils proof-of-origin token provider for yt-dlp. This avoids storing YouTube account cookies in GitHub, although YouTube can still block a GitHub-hosted runner IP. If that happens repeatedly, run the same playlist command from a trusted machine or move the job to a self-hosted runner.
+
 Run **Actions → Prepare daily songs → Run workflow** once before deploying the site. The first run imports the full playlist catalogs but downloads only the tracks needed for the seven-day queue.
 
 ## 4. Create the Cloudflare Worker

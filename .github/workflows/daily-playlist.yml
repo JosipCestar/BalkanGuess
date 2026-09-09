@@ -39,6 +39,9 @@ jobs:
       - name: Install application dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npm run db:generate
+
       - name: Verify media tools
         shell: powershell
         run: |

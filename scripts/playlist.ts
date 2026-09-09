@@ -17,6 +17,7 @@ config({ path: ".env.playlist.local", quiet: true });
 const root = dataDir();
 const ytdlp = process.env.YTDLP_PATH || "yt-dlp";
 const ffmpeg = process.env.FFMPEG_PATH || "ffmpeg";
+const youtubeBlocked = (error: unknown) => /sign in to confirm you(?:'|’)re not a bot/i.test(error instanceof Error ? error.message : String(error));
 function runCapture(command: string, args: string[]): Promise<{ out: string; err: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { shell: false, windowsHide: true });
@@ -180,7 +181,10 @@ async function main() {
               console.log(`Ready: ${dayKey}`);
               prepared = true;
               break;
-            } catch (error) { console.error(`Preparation failed for song ${song.id}:`, error instanceof Error ? error.message : error); }
+            } catch (error) {
+              if (youtubeBlocked(error)) throw new Error("YouTube blocked this runner's IP address. Use the configured self-hosted home runner.", { cause: error });
+              console.error(`Preparation failed for song ${song.id}:`, error instanceof Error ? error.message : error);
+            }
             finally { await cleanTemporaryDirectory(tempDir); }
           }
           if (!prepared) failures++;

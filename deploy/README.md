@@ -1,6 +1,6 @@
 # Cloudflare free-tier deployment
 
-The production layout uses Cloudflare Workers for the Next.js site and API routes, Supabase PostgreSQL for game data, a private Cloudflare R2 bucket for 16-second MP3 clips, and GitHub Actions for the daily playlist job. No always-running server is required.
+The production layout uses Cloudflare Workers for the Next.js site and API routes, Supabase PostgreSQL for game data, a private Cloudflare R2 bucket for 16-second MP3 clips, and GitHub Actions with a self-hosted Windows runner for the daily playlist job. The runner uses your home internet connection because YouTube blocks downloads from GitHub-hosted server addresses. Your computer only needs to be on when the daily job runs.
 
 ## 1. Supabase
 
@@ -17,7 +17,7 @@ In **R2 Object Storage**, create a private bucket named exactly `balkanguess-aud
 
 Create an R2 API token restricted to this bucket with **Object Read & Write**. Save its account ID, access key ID, and secret access key for GitHub Actions. The token is only for the daily upload job.
 
-## 3. GitHub Actions secrets
+## 3. GitHub Actions secrets and variables
 
 Open the repository's **Settings → Secrets and variables → Actions** and add:
 
@@ -31,11 +31,32 @@ R2_BUCKET_NAME
 
 Set `R2_BUCKET_NAME` to `balkanguess-audio`. The workflow in `.github/workflows/daily-playlist.yml` runs at 02:17 UTC and can also be started manually. It refreshes the three playlists, prepares seven Zagreb calendar days, uploads new clips, and publishes the matching rows to Supabase.
 
-The job runs a pinned local BgUtils proof-of-origin token provider for yt-dlp. This avoids storing YouTube account cookies in GitHub, although YouTube can still block a GitHub-hosted runner IP. If that happens repeatedly, run the same playlist command from a trusted machine or move the job to a self-hosted runner.
+On the same page, open the **Variables** tab and add these repository variables:
+
+```text
+YTDLP_PATH
+FFMPEG_PATH
+```
+
+Copy their full executable paths from your working `.env.playlist.local` file. `YTDLP_PATH` must point to `yt-dlp.exe`, and `FFMPEG_PATH` must point to `ffmpeg.exe`. Add these as variables because they are local file paths, not credentials. Do not paste them into this repository.
+
+## 4. Add the Windows runner
+
+Keep the runner attached only to this repository. The workflow accepts scheduled and manual runs, and deliberately has no pull-request trigger.
+
+1. Open the GitHub repository and go to **Settings → Actions → Runners**.
+2. Select **New self-hosted runner**, then choose **Windows** and **x64**.
+3. Open PowerShell as Administrator on the computer where the development downloader works.
+4. Create `C:\actions-runner` and run the download, extraction, and configuration commands shown by GitHub. Use GitHub's displayed commands because its registration token expires and must remain private.
+5. When configuration asks for additional labels, enter `balkanguess`.
+6. Accept the default work folder. Install the runner as a Windows service when prompted so scheduled jobs can start without an open terminal. If the media tools are inside your Windows user folder, configure the service to run as that Windows user so it can read them.
+7. Return to **Settings → Actions → Runners** and confirm that the runner is **Idle** with the `self-hosted`, `Windows`, `X64`, and `balkanguess` labels.
+
+The computer must be powered on and connected to the internet at the scheduled time. The current 02:17 UTC schedule is 04:17 in Zagreb during summer time and 03:17 during winter time. If the computer is off, GitHub queues the job until the runner becomes available.
 
 Run **Actions → Prepare daily songs → Run workflow** once before deploying the site. The first run imports the full playlist catalogs but downloads only the tracks needed for the seven-day queue.
 
-## 4. Create the Cloudflare Worker
+## 5. Create the Cloudflare Worker
 
 After installing Node.js 22 and this repository's dependencies, authenticate Wrangler:
 
@@ -59,7 +80,7 @@ Wrangler creates the `balkan-guess` Worker from `wrangler.jsonc`, uploads the vi
 
 The vinext adapter is currently a beta Cloudflare project, so keep its pinned versions in `package.json` and run `npm run build:cloudflare` when upgrading it.
 
-## 5. Validate production
+## 6. Validate production
 
 Before replacing an existing public URL, verify:
 

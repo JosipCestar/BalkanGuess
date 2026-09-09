@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, balkanguess]
     timeout-minutes: 45
     env:
       DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
@@ -23,9 +23,13 @@ jobs:
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+      YTDLP_PATH: ${{ vars.YTDLP_PATH }}
+      FFMPEG_PATH: ${{ vars.FFMPEG_PATH }}
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
@@ -35,15 +39,17 @@ jobs:
       - name: Install application dependencies
         run: npm ci
 
-      - name: Install media tools
+      - name: Verify media tools
+        shell: powershell
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes ffmpeg pipx
-          pipx install "yt-dlp[default]"
-          pipx inject yt-dlp "bgutil-ytdlp-pot-provider==2.0.0"
-          docker run --name bgutil-provider --detach --init --rm \
-            --publish 127.0.0.1:4416:4416 \
-            brainicism/bgutil-ytdlp-pot-provider:2.0.0
+          if (-not $env:YTDLP_PATH -or -not (Test-Path -LiteralPath $env:YTDLP_PATH -PathType Leaf)) {
+            throw "Set the repository variable YTDLP_PATH to the full path of yt-dlp.exe on the self-hosted runner."
+          }
+          if (-not $env:FFMPEG_PATH -or -not (Test-Path -LiteralPath $env:FFMPEG_PATH -PathType Leaf)) {
+            throw "Set the repository variable FFMPEG_PATH to the full path of ffmpeg.exe on the self-hosted runner."
+          }
+          & $env:YTDLP_PATH --version
+          & $env:FFMPEG_PATH -version
 
       - name: Apply database migrations
         run: npm run db:deploy

@@ -39,6 +39,6 @@ async function main() {
     await prisma.song.upsert({ where: { id: index + 1 }, update: values, create: values });
   }
   const dailySongs: Array<[string, number]> = [["2026-08-27", 1], ["2026-08-28", 2], ["2026-08-29", 3], ["2026-08-30", 4]];
-  for (const [date, songId] of dailySongs) await prisma.dailySong.upsert({ where: { date }, update: { songId }, create: { date, songId } });
+  for (const [date, songId] of dailySongs) await prisma.dailySong.upsert({ where: { date_category: { date, category: "legacy" } }, update: { songId }, create: { date, songId, category: "legacy" } });
 }
 main().finally(() => prisma.$disconnect());

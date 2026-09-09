@@ -1,9 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import { getCurrentChallengeDate, stableIndex } from "@/lib/challenge";
-export async function getDailySong(date = getCurrentChallengeDate()) {
-  const explicit = await prisma.dailySong.findUnique({ where: { date }, include: { song: true } });
-  if (explicit?.song.active) return explicit.song;
-  const songs = await prisma.song.findMany({ where: { active: true }, orderBy: { id: "asc" } });
-  if (!songs.length) return null;
-  return songs[stableIndex(date, songs.length)];
+import { getCurrentChallengeDate } from "./challenge";
+import { localMode } from "./runtime";
+import type { Category } from "./categories";
+export async function getDailySong(date = getCurrentChallengeDate(), category: Category = "club-mix") {
+  if (localMode()) {
+    const { readCatalog } = await import("./catalog");
+    const catalog = await readCatalog();
+    const id = catalog.days[`${date}:${category}`];
+    return catalog.songs.find(song => song.id === id && song.active && song.categories.includes(category) && song.clipKey) ?? null;
+  }
+  const daily = await prisma.dailySong.findUnique({ where: { date_category: { date, category } }, include: { song: true } });
+  return daily?.song.active && daily.song.categories.includes(category) ? daily.song : null;
 }

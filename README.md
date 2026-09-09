@@ -4,149 +4,60 @@
 
 **A daily Balkan music guessing game inspired by Heardle.**
 
-Listen to a short audio snippet, identify the song, and try to solve the daily challenge in six attempts.
-
-[Play the live game](https://balkanguess.up.railway.app/) · [Report an issue](https://github.com/JosipCestar/BalkanGuess/issues)
-
-![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=flat-square&logo=postgresql&logoColor=white)
-![Railway](https://img.shields.io/badge/Deployed_on-Railway-0B0D0E?style=flat-square&logo=railway)
+Listen to progressively longer parts of a song and solve each daily category in six attempts.
 
 </div>
 
-## About
+## Categories
 
-BalkanGuess gives every player the same song each day. The round begins with a one-second snippet and unlocks progressively longer clips after skipped or incorrect guesses. Progress is stored locally, so no account is required.
+- Balkan Club Mix is the main daily challenge.
+- Jala i Buba is a focused secondary category.
+- EXYU is a focused secondary category.
 
-## Features
+Each category has its own daily song, attempts, saved browser progress, and anonymous aggregate results.
 
-- One shared Balkan song challenge every day
-- Six attempts with 1, 2, 4, 7, 11, and 16-second snippets
-- Searchable song and artist suggestions
-- Skip, guess, win, and loss states
-- Progress persisted in the browser
-- Server-side SoundCloud integration with no exposed API credentials
-- Responsive black-and-white interface for mobile and desktop
-- PostgreSQL-backed song catalog and daily challenge assignment
-
-## Tech stack
+## Technology
 
 | Area | Technology |
 | --- | --- |
-| Application | Next.js 16, React 19, TypeScript |
-| Database | PostgreSQL, Prisma ORM |
-| Audio | SoundCloud API through a server-side provider |
-| Testing | Vitest, TypeScript, ESLint |
-| Deployment | Railway |
+| Web application | Next.js 16, React 19, TypeScript |
+| Database | Supabase PostgreSQL with Prisma |
+| Audio storage | Private Cloudflare R2 bucket bound directly to the Worker |
+| Daily worker | GitHub Actions, yt-dlp, FFmpeg, SponsorBlock intro markers |
+| Hosting | Cloudflare Workers through vinext |
+| Verification | Vitest, TypeScript, ESLint |
 
-## Getting started
+## Local playlist development
 
-### Requirements
-
-- Node.js 20.9 or newer
-- PostgreSQL
-- SoundCloud API credentials
-
-### Installation
-
-```bash
-git clone https://github.com/JosipCestar/BalkanGuess.git
-cd BalkanGuess
-npm install
-```
-
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-On Windows PowerShell, use:
+Install Node.js 22, yt-dlp, FFmpeg, and ffprobe, then install dependencies:
 
 ```powershell
-Copy-Item .env.example .env
-```
-
-Add your own values to `.env`:
-
-```env
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
-SOUNDCLOUD_CLIENT_ID="your_client_id"
-SOUNDCLOUD_CLIENT_SECRET="your_client_secret"
-```
-
-Prepare the database and start the development server:
-
-```bash
+npm install
 npm run db:generate
-npm run db:migrate -- --name init
-npm run db:seed
-npm run dev
+npm run dev:playlist
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://127.0.0.1:3001](http://127.0.0.1:3001). The local playlist mode reads ignored files under `data/` and does not modify the production database or R2 bucket. See [DEVELOPMENT.md](DEVELOPMENT.md) for playlist imports, automatic intro detection, manual start overrides, and validation commands.
 
-> Never commit `.env`. SoundCloud credentials must remain server-side and must not use the `NEXT_PUBLIC_` prefix.
+## Production deployment
 
-## Available scripts
+Production uses Cloudflare Workers, Supabase, a private Cloudflare R2 bucket, and the workflow in `.github/workflows/daily-playlist.yml`. Follow [deploy/README.md](deploy/README.md) to create the services, configure secrets, run the initial catalog import, and validate the public deployment.
+
+## Main commands
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start the local development server |
-| `npm run build` | Generate Prisma Client and create a production build |
-| `npm run start` | Start the production server |
-| `npm run typecheck` | Check TypeScript types |
+| `npm run dev:playlist` | Start isolated local playlist development |
+| `npm run playlist -- import CATEGORY URL` | Add or refresh a source playlist |
+| `npm run playlist -- prepare 7` | Prepare seven days of MP3 clips |
+| `npm run playlist -- publish` | Publish catalog and assignments to PostgreSQL |
+| `npm run playlist -- find QUERY` | Find a catalog song and its local ID |
+| `npm run playlist -- start ID SECONDS` | Override a song's clip starting point |
+| `npm test` | Run unit tests |
+| `npm run typecheck` | Check TypeScript |
 | `npm run lint` | Run ESLint |
-| `npm test` | Run the test suite |
-| `npm run db:migrate` | Create and apply a development migration |
-| `npm run db:deploy` | Apply existing migrations in production |
-| `npm run db:seed` | Seed the song catalog |
+| `npm run build` | Create the production build |
+| `npm run build:cloudflare` | Verify the Cloudflare Worker build |
+| `npm run deploy:cloudflare` | Build and deploy to Cloudflare Workers |
 
-## How the daily challenge works
-
-An optional `DailySong` database record can assign a specific song to a Zagreb calendar date. When no assignment exists, the server uses a stable date-based selection from active songs. The browser stores attempts, guesses, skips, and the completed result under a date-specific local-storage key.
-
-All Prisma and SoundCloud requests run through Next.js route handlers. SoundCloud access tokens and credentials are never sent to the browser.
-
-## Adding music
-
-Add permitted public SoundCloud tracks to `prisma/seed.ts` or directly to the `Song` table. Each song needs its SoundCloud track ID and public URL. `previewStart` controls where the guessing snippet begins.
-
-The seed operation is idempotent, making it safe to run again after catalog changes. Unavailable, blocked, or non-streamable tracks return a visible error instead of silently substituting different audio.
-
-Only add audio that you own or have permission to use. Preserve SoundCloud attribution and links in accordance with the platform's requirements.
-
-## Deploying to Railway
-
-1. Create a Railway project and add a PostgreSQL service.
-2. Deploy this GitHub repository as a service.
-3. Reference the PostgreSQL service's `DATABASE_URL` from the web service.
-4. Add `SOUNDCLOUD_CLIENT_ID` and `SOUNDCLOUD_CLIENT_SECRET` as private variables.
-5. Set the pre-deploy command to `npm run db:deploy && npm run db:seed`.
-6. Set the health-check path to `/api/health`.
-7. Generate a public domain from the service's Networking settings.
-
-## Project structure
-
-```text
-app/                 Pages, styling, and API routes
-components/game/     Game interface and snippet player
-lib/                 Game rules, database helpers, and providers
-lib/soundcloud/      SoundCloud authentication and API client
-prisma/              Schema, migrations, and seed catalog
-tests/               Automated tests
-```
-
-## SoundCloud resources
-
-- [API documentation](https://developers.soundcloud.com/docs)
-- [App registration](https://developers.soundcloud.com/docs/api/register-app)
-- [API terms of use](https://developers.soundcloud.com/docs/api/terms-of-use)
-- [Branding guidance](https://developers.soundcloud.com/docs/api/buttons-logos)
-
----
-
-<div align="center">
-Built as a software development project for Balkan music fans.
-</div>
+Only use source audio that you have permission to download, process, and host. Playlist visibility does not grant rights to the recordings.

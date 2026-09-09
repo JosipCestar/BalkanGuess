@@ -457,3 +457,6 @@ input:focus { border-color: var(--accent); background: #0b0d08; box-shadow: 0 0 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+
+.category-tabs { display:flex; gap:10px; flex-wrap:wrap; max-width:680px; margin:20px auto; justify-content:center; }
+.category-tabs button[aria-pressed=true] { background:#ffdf6b; color:#141414; border-color:#ffdf6b; }

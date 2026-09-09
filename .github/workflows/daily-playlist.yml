@@ -1,0 +1,56 @@
+name: Prepare daily songs
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-playlist
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+      CATALOG_STORAGE: r2
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg pipx
+          pipx install "yt-dlp[default]"
+
+      - name: Apply database migrations
+        run: npm run db:deploy
+
+      - name: Refresh playlist catalog
+        run: |
+          npm run playlist -- import club-mix 'https://www.youtube.com/playlist?list=PLJ14wpRv6ztY'
+          npm run playlist -- import jala-buba 'https://www.youtube.com/playlist?list=PLVQZG1Rymm4U'
+          npm run playlist -- import exyu 'https://www.youtube.com/playlist?list=PLEENVhYLmeNM'
+
+      - name: Prepare and publish seven days
+        run: |
+          npm run playlist -- prepare 7
+          npm run playlist -- publish

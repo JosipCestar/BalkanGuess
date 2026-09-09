@@ -7,14 +7,18 @@ import { useSnippetPlayback } from "./useSnippetPlayback";
 type Source = {
   url: string;
   previewStart: number;
-  attribution: { creator: string; soundcloudUrl: string };
+  attribution?: { creator: string; soundcloudUrl: string };
 };
 
 export function AudioPlayer({
+  category,
+  date,
   duration,
   disabled,
   onError,
 }: {
+  category: string;
+  date?: string;
   duration: number;
   disabled?: boolean;
   onError: (message: string) => void;
@@ -36,8 +40,8 @@ export function AudioPlayer({
         if (!sourceRequestRef.current)
           sourceRequestRef.current = (async () => {
             setSourceLoading(true);
-            const response = await fetch("/api/daily/audio");
-            const data = await response.json();
+            const response = await fetch(`/api/daily/audio?category=${category}&date=${date}`);
+            const data = await response.json() as Source & { error?: string };
             if (!response.ok)
               throw new Error(data.error || "Audio is unavailable.");
             return data as Source;
@@ -57,7 +61,7 @@ export function AudioPlayer({
         error instanceof Error ? error.message : "Could not play audio.",
       );
     }
-  }, [duration, play, stableOnError]);
+  }, [duration, play, stableOnError, category, date]);
 
   useEffect(() => {
     stop();

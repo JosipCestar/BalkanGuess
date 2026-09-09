@@ -13,14 +13,13 @@ function waitForMediaEvent(player: HTMLAudioElement, eventName: "loadedmetadata"
       signal.removeEventListener("abort", onAbort);
     };
     const onSuccess = () => { cleanup(); resolve(); };
-    const onError = () => { cleanup(); reject(new Error("The SoundCloud audio stream could not be loaded.")); };
+    const onError = () => { cleanup(); reject(new Error("The audio clip could not be loaded.")); };
     const onAbort = () => { cleanup(); reject(new DOMException("Playback superseded.", "AbortError")); };
     player.addEventListener(eventName, onSuccess, { once: true });
     player.addEventListener("error", onError, { once: true });
     signal.addEventListener("abort", onAbort, { once: true });
   });
 }
-
 export function useSnippetPlayback(onError: (message: string) => void) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const boundsRef = useRef<SnippetBounds | null>(null);
@@ -75,10 +74,10 @@ export function useSnippetPlayback(onError: (message: string) => void) {
         player = new Audio();
         player.preload = "auto";
         player.addEventListener("timeupdate", enforceBoundary);
-        player.addEventListener("error", () => onError("The SoundCloud audio stream could not be played."));
+        player.addEventListener("error", () => onError("The audio clip could not be played."));
         audioRef.current = player;
       }
-      if (player.src !== bounds.url) {
+      if (player.src !== new URL(bounds.url, window.location.href).href) {
         player.src = bounds.url;
         player.load();
       }

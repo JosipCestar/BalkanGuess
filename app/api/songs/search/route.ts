@@ -1,4 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { categorySongs } from "@/lib/songs";
+import { categoryFrom } from "@/lib/categories";
 import { normalizeBalkanText } from "@/lib/text";
-export async function GET(request: NextRequest) { const q = normalizeBalkanText(request.nextUrl.searchParams.get("q") || ""); if (!q) return NextResponse.json([]); const terms = q.split(" "); const songs = await prisma.song.findMany({ where: { active: true, AND: terms.map(term => ({ OR: [{ normalizedTitle: { contains: term } }, { normalizedArtist: { contains: term } }] })) }, select: { id: true, title: true, artist: true }, take: 8 }); return NextResponse.json(songs); }
+export async function GET(request: NextRequest) {
+  try {
+    const q = normalizeBalkanText((request.nextUrl.searchParams.get("q") || "").slice(0, 200));
+    if (!q) return NextResponse.json([]);
+    const songs = await categorySongs(categoryFrom(request.nextUrl.searchParams.get("category")));
+    return NextResponse.json(songs.filter(song => q.split(" ").every(term => normalizeBalkanText(`${song.artist} ${song.title}`).includes(term))).slice(0, 8).map(({ id, title, artist }) => ({ id, title, artist })));
+  } catch { return NextResponse.json({ error: "Search unavailable." }, { status: 503 }); }
+}

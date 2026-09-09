@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
@@ -8,7 +9,7 @@ datasource db {
 }
 
 model Song {
-  id                Int       @id @default(autoincrement())
+  id                Int         @id @default(autoincrement())
   title             String
   artist            String
   normalizedTitle   String
@@ -18,28 +19,36 @@ model Song {
   genre             String?
   soundcloudTrackId String?
   soundcloudUrl     String?
-  previewStart      Float     @default(0)
-  active            Boolean   @default(true)
-  createdAt         DateTime  @default(now())
+  sourceUrl         String?     @unique
+  clipKey           String?
+  categories        String[]    @default([])
+  previewStart      Float       @default(0)
+  active            Boolean     @default(true)
+  createdAt         DateTime    @default(now())
   dailySongs        DailySong[]
+
   @@index([active])
 }
 
 model DailySong {
-  id     Int    @id @default(autoincrement())
-  date   String @unique
-  songId Int
-  song   Song   @relation(fields: [songId], references: [id], onDelete: Restrict)
+  id       Int    @id @default(autoincrement())
+  date     String
+  category String @default("legacy")
+  songId   Int
+  song     Song   @relation(fields: [songId], references: [id], onDelete: Restrict)
+
+  @@unique([date, category])
 }
 
 model DailyResult {
   id         Int      @id @default(autoincrement())
   date       String
+  category   String   @default("legacy")
   playerHash String
   won        Boolean
   attempt    Int
   createdAt  DateTime @default(now())
 
-  @@unique([date, playerHash])
+  @@unique([date, category, playerHash])
   @@index([date])
 }

@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { AudioPlayer } from "./AudioPlayer";
+import { CATEGORIES, type Category } from "@/lib/categories";
 import { DURATIONS, scoreForAttempt } from "@/lib/game";
 import type { DailyStats } from "@/lib/daily-stats";
 
 type Song = { id: number; artist: string; title: string };
-type Answer = { artist: string; title: string; soundcloudUrl?: string | null };
+type Answer = { artist: string; title: string; sourceUrl?: string | null; soundcloudUrl?: string | null };
+type DailyResponse = { error?: string; ready: boolean; development: boolean; date: string; challengeNumber: number };
+type GuessResponse = { error?: string; correct: boolean; artistMatch: boolean; answer?: Answer };
 type Entry = { type: "wrong" | "skip" | "artist" | "correct"; song?: Song };
 type Saved = {
   attempt: number;
@@ -46,7 +49,6 @@ function DailyStatsPanel({ stats, loading }: { stats?: DailyStats; loading: bool
     <p className="stats-caption">Attempt number · completed players</p>
   </section>;
 }
-
 function ResultDialog({ game, number, stats, statsLoading, onClose, onShare }: {
   game: Saved;
   number?: number;
@@ -79,6 +81,7 @@ function ResultDialog({ game, number, stats, statsLoading, onClose, onShare }: {
         allow="autoplay"
         src={embedUrl}
       />}
+      {answer.sourceUrl && <a className="track-link" href={answer.sourceUrl} target="_blank" rel="noreferrer">Open original video</a>}
       {answer.soundcloudUrl && <a className="track-link" href={answer.soundcloudUrl} target="_blank" rel="noreferrer">Open track on SoundCloud</a>}
       <div className="actions">
         <button className="secondary" onClick={onShare}>SHARE RESULT</button>
@@ -87,8 +90,13 @@ function ResultDialog({ game, number, stats, statsLoading, onClose, onShare }: {
     </section>
   </div>;
 }
-
 export function Game() {
+  const [category, setCategory] = useState<Category>("club-mix");
+  return <><nav className="category-tabs" aria-label="Music categories">{CATEGORIES.map(item => <button key={item.id} className="secondary" aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</nav><CategoryGame key={category} category={category} /></>;
+}
+function CategoryGame({ category }: { category: Category }) {
+  const [ready, setReady] = useState(false);
+  const [development, setDevelopment] = useState(false);
   const [date, setDate] = useState<string>();
   const [number, setNumber] = useState<number>();
   const [game, setGame] = useState<Saved>(empty);
@@ -102,35 +110,38 @@ export function Game() {
   const [statsLoading, setStatsLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/daily").then(response => response.json()).then(data => {
+    fetch(`/api/daily?category=${category}`).then(response => response.json() as Promise<DailyResponse>).then(data => {
+      if (data.error) throw new Error(data.error);
+      setReady(data.ready);
+      setDevelopment(data.development);
       setDate(data.date);
       setNumber(data.challengeNumber);
-      const raw = localStorage.getItem(`balkanguess:${data.date}`);
+      const raw = localStorage.getItem(`balkanguess:v2:${category}:${data.date}`);
       if (raw) setGame(JSON.parse(raw));
     }).catch(() => setError("Could not load today’s challenge."));
-  }, []);
+  }, [category]);
 
   useEffect(() => {
-    if (date) localStorage.setItem(`balkanguess:${date}`, JSON.stringify(game));
-  }, [date, game]);
+    if (date) localStorage.setItem(`balkanguess:v2:${category}:${date}`, JSON.stringify(game));
+  }, [date, game, category]);
 
   useEffect(() => {
     if (!date || !game.completed || game.answer) return;
     fetch("/api/daily/reveal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date }),
-    }).then(response => response.json()).then(data => {
+      body: JSON.stringify({ date, category }),
+    }).then(response => response.json() as Promise<{ answer?: Answer }>).then(data => {
       if (data.answer) setGame(previous => ({ ...previous, answer: data.answer }));
     }).catch(() => setError("Could not reveal the answer."));
-  }, [date, game.completed, game.answer]);
+  }, [date, game.completed, game.answer, category]);
 
   useEffect(() => {
     if (game.completed && game.answer) setResultOpen(true);
   }, [game.completed, game.answer]);
 
   useEffect(() => {
-    if (!date || !game.completed) return;
+    if (!date || !game.completed || development) return;
     setStatsLoading(true);
     let playerId = localStorage.getItem("balkanguess:player-id");
     if (!playerId) {
@@ -141,26 +152,26 @@ export function Game() {
     fetch("/api/daily/stats", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, playerId, won: game.won, attempt: game.attempt }),
+      body: JSON.stringify({ date, category, playerId, won: game.won, attempt: game.attempt }),
     }).then(response => {
       if (!response.ok) throw new Error("Could not load stats.");
-      return response.json();
+      return response.json() as Promise<DailyStats>;
     }).then(setStats).catch(() => undefined).finally(() => setStatsLoading(false));
-  }, [date, game.completed, game.won, game.attempt]);
+  }, [date, game.completed, game.won, game.attempt, category, development]);
 
   useEffect(() => {
     if (!query.trim()) { setResults([]); return; }
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetch(`/api/songs/search?q=${encodeURIComponent(query)}`, { signal: controller.signal })
-        .then(response => response.json())
-        .then((items: Song[]) => {
+      fetch(`/api/songs/search?category=${category}&q=${encodeURIComponent(query)}`, { signal: controller.signal })
+        .then(response => response.json() as Promise<Song[]>)
+        .then(items => {
           setResults(items.filter(song => !game.guesses.includes(song.id)));
           setHighlight(-1);
         }).catch(() => undefined);
     }, 150);
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [query, game.guesses]);
+  }, [query, game.guesses, category]);
 
   const duration = DURATIONS[Math.min(game.attempt, 5)];
 
@@ -179,15 +190,15 @@ export function Game() {
   });
 
   const guess = async () => {
-    if (!selected || game.completed) return;
+    if (!selected || !ready || game.completed) return;
     setError("");
     try {
       const response = await fetch("/api/daily/guess", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, guessedSongId: selected.id }),
+        body: JSON.stringify({ date, category, guessedSongId: selected.id }),
       });
-      const data = await response.json();
+      const data = await response.json() as GuessResponse;
       if (!response.ok) throw new Error(data.error || "Could not validate guess.");
       const type: Entry["type"] = data.correct ? "correct" : data.artistMatch ? "artist" : "wrong";
       consume({ type, song: selected }, data.answer);
@@ -199,14 +210,14 @@ export function Game() {
     }
   };
 
-  const skip = () => { if (!game.completed) consume({ type: "skip" }); };
+  const skip = () => { if (ready && !game.completed) consume({ type: "skip" }); };
 
   const share = async () => {
     const cells = Array.from({ length: 6 }, (_, index) => {
       const entry = game.entries[index];
       return entry?.type === "correct" ? "🟩" : entry?.type === "artist" ? "🟨" : entry?.type === "wrong" ? "🟥" : entry?.type === "skip" ? "⬛" : "⬜";
     }).join("");
-    const text = `BalkanGuess #${number}\n\n${cells}\n\n${game.won ? `${scoreForAttempt(game.attempt - 1)} points` : "No score"}`;
+    const text = `BalkanGuess · ${CATEGORIES.find(item => item.id === category)?.label} #${number}\n\n${cells}\n\n${game.won ? `${scoreForAttempt(game.attempt - 1)} points` : "No score"}`;
     try {
       if (navigator.share) await navigator.share({ text });
       else await navigator.clipboard.writeText(text);
@@ -240,17 +251,19 @@ export function Game() {
         </div>
         <p className="daily-number"><span>EP</span> #{number ?? "…"}</p>
       </header>
+      {development && <div className="dev-notice"><p className="muted">Development preview · progress saved on this device · shared statistics disabled</p><button className="secondary" onClick={() => { setGame(empty); setQuery(""); setSelected(undefined); setResults([]); setError(""); setResultOpen(false); }}>RESET TEST ROUND</button></div>}
+      {!ready && date && <p className="error" role="status">No prepared song in this category yet. Choose another category.</p>}
       <div className="card">
         <div className="card-kicker"><span>Mystery track</span><span>6 tries</span></div>
         <div className="mystery" aria-label="Hidden song title">?????</div>
         <p className="muted">Attempt {Math.min(game.attempt + 1, 6)} of 6 · {duration} second snippet</p>
-        <AudioPlayer duration={duration} disabled={!date || game.completed} onError={setError} />
+        <AudioPlayer category={category} date={date} duration={duration} disabled={!date || !ready || game.completed} onError={setError} />
         <div className="progress" aria-label={`${duration} seconds unlocked`}>
           {DURATIONS.map((_, index) => <span key={index} className={index <= game.attempt ? "on" : ""} />)}
         </div>
         {error && <p className="error" role="status">{error}</p>}
 
-        {!game.completed && <div className="search">
+        {ready && !game.completed && <div className="search">
           <label htmlFor="song-search" className="eyebrow">Search song or artist</label>
           <input
             id="song-search"

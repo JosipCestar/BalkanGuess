@@ -60,7 +60,7 @@ jobs:
           npm run playlist -- import jala-buba 'https://www.youtube.com/playlist?list=PLVQZG1Rymm4U'
           npm run playlist -- import exyu 'https://www.youtube.com/playlist?list=PLEENVhYLmeNM'
 
-      - name: Prepare and publish seven days
+      - name: Prepare and publish two days
         run: |
-          npm run playlist -- prepare 7
+          npm run playlist -- prepare 2
           npm run playlist -- publish

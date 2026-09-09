@@ -29,7 +29,7 @@ R2_SECRET_ACCESS_KEY
 R2_BUCKET_NAME
 ```
 
-Set `R2_BUCKET_NAME` to `balkanguess-audio`. The workflow in `.github/workflows/daily-playlist.yml` runs at 02:17 UTC and can also be started manually. It refreshes the three playlists, prepares seven Zagreb calendar days, uploads new clips, and publishes the matching rows to Supabase.
+Set `R2_BUCKET_NAME` to `balkanguess-audio`. The workflow in `.github/workflows/daily-playlist.yml` runs at 02:17 UTC and can also be started manually. It refreshes the three playlists, prepares two Zagreb calendar days, uploads new clips, and publishes the matching rows to Supabase.
 
 On the same page, open the **Variables** tab and add these repository variables:
 
@@ -54,7 +54,7 @@ Keep the runner attached only to this repository. The workflow accepts scheduled
 
 The computer must be powered on and connected to the internet at the scheduled time. The current 02:17 UTC schedule is 04:17 in Zagreb during summer time and 03:17 during winter time. If the computer is off, GitHub queues the job until the runner becomes available.
 
-Run **Actions → Prepare daily songs → Run workflow** once before deploying the site. The first run imports the full playlist catalogs but downloads only the tracks needed for the seven-day queue.
+Run **Actions → Prepare daily songs → Run workflow** once before deploying the site. The first run imports the full playlist catalogs but downloads only the tracks needed for the two-day queue.
 
 ## 5. Create the Cloudflare Worker
 

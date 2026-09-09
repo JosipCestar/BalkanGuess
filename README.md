@@ -49,7 +49,7 @@ Production uses Cloudflare Workers, Supabase, a private Cloudflare R2 bucket, an
 | --- | --- |
 | `npm run dev:playlist` | Start isolated local playlist development |
 | `npm run playlist -- import CATEGORY URL` | Add or refresh a source playlist |
-| `npm run playlist -- prepare 7` | Prepare seven days of MP3 clips |
+| `npm run playlist -- prepare 2` | Prepare two days of MP3 clips |
 | `npm run playlist -- publish` | Publish catalog and assignments to PostgreSQL |
 | `npm run playlist -- find QUERY` | Find a catalog song and its local ID |
 | `npm run playlist -- start ID SECONDS` | Override a song's clip starting point |

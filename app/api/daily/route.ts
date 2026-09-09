@@ -9,5 +9,8 @@ export async function GET(request: NextRequest) {
     const date = getCurrentChallengeDate();
     const song = await getDailySong(date, category);
     return NextResponse.json({ challengeNumber: challengeNumber(date), date, category, categories: CATEGORIES, ready: !!song, development: localMode(), attempts: 6 }, { headers: { "Cache-Control": "no-store" } });
-  } catch { return NextResponse.json({ error: "Could not load challenge." }, { status: 503 }); }
+  } catch (error) {
+    console.error("Could not load daily challenge:", error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+    return NextResponse.json({ error: "Could not load challenge." }, { status: 503 });
+  }
 }

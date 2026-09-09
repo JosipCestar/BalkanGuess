@@ -1,5 +1,5 @@
 import type { Category } from "./categories";
-import { prisma } from "./prisma";
+import { withPrisma } from "./prisma-client";
 import { localMode } from "./runtime";
 
 export async function categorySongs(category: Category) {
@@ -8,8 +8,8 @@ export async function categorySongs(category: Category) {
     return (await readCatalog()).songs.filter(song => song.active && song.categories.includes(category));
   }
 
-  return prisma.song.findMany({
+  return withPrisma(prisma => prisma.song.findMany({
     where: { active: true, categories: { has: category } },
     orderBy: { id: "asc" },
-  });
+  }));
 }

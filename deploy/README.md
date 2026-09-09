@@ -64,13 +64,13 @@ After installing Node.js 22 and this repository's dependencies, authenticate Wra
 npx wrangler login
 ```
 
-Create the production database secret. Paste the Supabase transaction pooler URL when prompted:
+For the first deployment, run the bootstrap command. It builds the Worker, securely prompts for the Supabase transaction pooler URL, uploads that secret with the first Worker version, and deletes its temporary secrets file:
 
 ```powershell
-npx wrangler secret put DATABASE_URL
+npm run deploy:cloudflare:first
 ```
 
-Then deploy:
+Paste the complete transaction pooler URL using port 6543 when prompted. Input is hidden while you paste it. After the first deployment, use the regular command for future releases; Wrangler preserves the deployed secret:
 
 ```powershell
 npm run deploy:cloudflare

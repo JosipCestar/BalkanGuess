@@ -1,6 +1,6 @@
 # Cloudflare free-tier deployment
 
-The production layout uses Cloudflare Workers for the Next.js site and API routes, Supabase PostgreSQL for game data, a private Cloudflare R2 bucket for 16-second MP3 clips, and GitHub Actions with a self-hosted Windows runner for the daily playlist job. The runner uses your home internet connection because YouTube blocks downloads from GitHub-hosted server addresses. Your computer only needs to be on when the daily job runs.
+The production layout uses Cloudflare Workers for the Next.js site and API routes, Supabase PostgreSQL for player statistics and mirrored assignments, a private Cloudflare R2 bucket for the playlist catalog and 16-second MP3 clips, and GitHub Actions with a self-hosted Windows runner for the daily playlist job. The Worker reads daily challenges directly from R2, so a statistics database outage does not stop the game. The runner uses your home internet connection because YouTube blocks downloads from GitHub-hosted server addresses. Your computer only needs to be on when the daily job runs.
 
 ## 1. Supabase
 

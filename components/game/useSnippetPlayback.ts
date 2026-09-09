@@ -20,7 +20,7 @@ function waitForMediaEvent(player: HTMLAudioElement, eventName: "loadedmetadata"
     signal.addEventListener("abort", onAbort, { once: true });
   });
 }
-export function useSnippetPlayback(onError: (message: string) => void) {
+export function useSnippetPlayback(onError: (message: string) => void, volume = 1) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const boundsRef = useRef<SnippetBounds | null>(null);
   const frameRef = useRef<number | null>(null);
@@ -77,6 +77,7 @@ export function useSnippetPlayback(onError: (message: string) => void) {
         player.addEventListener("error", () => onError("The audio clip could not be played."));
         audioRef.current = player;
       }
+      player.volume = Math.min(1, Math.max(0, volume));
       if (player.src !== new URL(bounds.url, window.location.href).href) {
         player.src = bounds.url;
         player.load();
@@ -112,7 +113,11 @@ export function useSnippetPlayback(onError: (message: string) => void) {
     } finally {
       if (pendingRef.current === pending) pendingRef.current = null;
     }
-  }, [cancelFrame, enforceBoundary, onError, stop]);
+  }, [cancelFrame, enforceBoundary, onError, stop, volume]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = Math.min(1, Math.max(0, volume));
+  }, [volume]);
 
   useEffect(() => () => {
     sessionRef.current += 1;

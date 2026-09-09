@@ -224,6 +224,38 @@ h2 { margin: 5px 0 18px; letter-spacing: -.035em; }
 .play:active:not(:disabled) { transform: translateY(0); }
 .play:disabled, .secondary:disabled { cursor: not-allowed; opacity: .38; }
 
+.audio-controls { display: grid; gap: 12px; }
+
+.volume-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.volume-control input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.volume-control input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.volume-control span {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-align: right;
+}
+
 .soundcloud-attribution {
   position: fixed;
   right: 0;

@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { useSnippetPlayback } from "./useSnippetPlayback";
+
+const VOLUME_STORAGE_KEY = "balkanguess:volume";
+const DEFAULT_VOLUME = 0.8;
 
 export function AudioPlayer({
   sourceUrl,
@@ -14,11 +17,26 @@ export function AudioPlayer({
   disabled?: boolean;
   onError: (message: string) => void;
 }) {
+  const volumeId = useId();
+  const [volume, setVolume] = useState(DEFAULT_VOLUME);
   const stableOnError = useCallback(
     (message: string) => onError(message),
     [onError],
   );
-  const { play, stop, status } = useSnippetPlayback(stableOnError);
+  const { play, stop, status } = useSnippetPlayback(stableOnError, volume);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(VOLUME_STORAGE_KEY);
+    if (stored === null) return;
+    const parsed = Number(stored);
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) setVolume(parsed);
+  }, []);
+
+  const changeVolume = (value: string) => {
+    const nextVolume = Math.min(1, Math.max(0, Number(value) / 100));
+    setVolume(nextVolume);
+    window.localStorage.setItem(VOLUME_STORAGE_KEY, String(nextVolume));
+  };
 
   const playSnippet = useCallback(async () => {
     try {
@@ -50,7 +68,7 @@ export function AudioPlayer({
   }, [disabled, playSnippet]);
 
   return (
-    <>
+    <div className="audio-controls">
       <button
         className='play'
         disabled={disabled || status === "loading"}
@@ -63,6 +81,20 @@ export function AudioPlayer({
             ? `↻ REPLAY ${duration}s`
             : `▶ PLAY ${duration}s`}
       </button>
-    </>
+      <div className="volume-control">
+        <label htmlFor={volumeId}>VOLUME</label>
+        <input
+          id={volumeId}
+          type="range"
+          min="0"
+          max="100"
+          step="5"
+          value={Math.round(volume * 100)}
+          onChange={event => changeVolume(event.target.value)}
+          aria-valuetext={`${Math.round(volume * 100)} percent`}
+        />
+        <span aria-hidden="true">{Math.round(volume * 100)}%</span>
+      </div>
+    </div>
   );
 }

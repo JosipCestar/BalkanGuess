@@ -7,7 +7,8 @@
   ],
   "secrets": {
     "required": [
-      "DATABASE_URL"
+      "DATABASE_URL",
+      "GAME_TOKEN_SECRET"
     ]
   },
   "main": "vinext/server/fetch-handler",
@@ -26,6 +27,48 @@
     {
       "binding": "AUDIO_BUCKET",
       "bucket_name": "balkanguess-audio"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "SESSION_RATE_LIMITER",
+      "namespace_id": "731940101",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "GAME_RATE_LIMITER",
+      "namespace_id": "731940102",
+      "simple": { "limit": 12, "period": 60 }
+    },
+    {
+      "name": "SEARCH_RATE_LIMITER",
+      "namespace_id": "731940103",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "MEDIA_RATE_LIMITER",
+      "namespace_id": "731940104",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    {
+      "name": "ABUSE_IP_RATE_LIMITER",
+      "namespace_id": "731940105",
+      "simple": { "limit": 180, "period": 60 }
+    },
+    {
+      "name": "STATS_READ_RATE_LIMITER",
+      "namespace_id": "731940106",
+      "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      "name": "STATS_USER_RATE_LIMITER",
+      "namespace_id": "731940107",
+      "simple": { "limit": 6, "period": 60 }
+    },
+    {
+      "name": "STATS_IP_RATE_LIMITER",
+      "namespace_id": "731940108",
+      "simple": { "limit": 30, "period": 60 }
     }
   ]
 }

@@ -17,21 +17,16 @@ jobs:
     runs-on: [self-hosted, Windows, X64, balkanguess]
     timeout-minutes: 45
     env:
-      DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
       CATALOG_STORAGE: r2
-      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
       YTDLP_PATH: ${{ vars.YTDLP_PATH }}
       FFMPEG_PATH: ${{ vars.FFMPEG_PATH }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
 
@@ -55,14 +50,24 @@ jobs:
 
       - name: Apply database migrations
         run: npm run db:deploy
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
 
       - name: Refresh playlist catalog
         run: |
           npm run playlist -- import club-mix 'https://www.youtube.com/playlist?list=PLJ14wpRv6ztY'
           npm run playlist -- import jala-buba 'https://www.youtube.com/playlist?list=PLVQZG1Rymm4U'
           npm run playlist -- import exyu 'https://www.youtube.com/playlist?list=PLEENVhYLmeNM'
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
-      - name: Prepare and publish two days
-        run: |
-          npm run playlist -- prepare 2
-          npm run playlist -- publish
+      - name: Prepare two days
+        run: npm run playlist -- prepare 2
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}

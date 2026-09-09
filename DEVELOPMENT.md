@@ -8,6 +8,8 @@ attempts persist in the browser independently for each category and date.
 The local catalog uses Balkan Club Mix as the main challenge, with Jala i Buba and EXYU as secondary categories.
 Generated catalogs and audio are in the ignored `data/` folder. They are not shipped in Git or Vercel deployments.
 
+Cloudflare preview does not import the root `.env` into build output. Put preview-only Worker values in an ignored `.dev.vars` file; production values must remain Wrangler secrets.
+
 ## Import and prepare
 
 Install Node 22, yt-dlp (including its default dependencies/EJS), FFmpeg, and ffprobe.
@@ -38,7 +40,7 @@ The `start` command removes the old generated clip, if present. `prepare` rebuil
 
 Preparation also detects starts automatically. It first checks the public SponsorBlock `intro`, `selfpromo`, and `music_offtopic` markers. If none exist and the downloaded video's channel/uploader identifies IDJ, FFmpeg looks for the short quiet boundary between the label animation and the song during the first 30 seconds. A detected value is saved to `previewStart`; a manually configured non-zero value always wins.
 
-Only `publish` writes to PostgreSQL. `import` and `prepare` work on local files.
+Only the optional `publish` command writes catalog rows to PostgreSQL. Production reads the catalog from R2, so the scheduled workflow runs `import` and `prepare` without this redundant mirror step.
 Re-importing is additive and deduplicates by video URL; removing a video from YouTube does not remove it from the catalog.
 To retire a song, set `active` to false in the catalog, then prepare replacement future assignments before publishing.
 Review `data/catalog.json` for title/artist accuracy and `data/review-CATEGORY.json` for skipped entries.

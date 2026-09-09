@@ -50,5 +50,15 @@ model DailyResult {
   createdAt  DateTime @default(now())
 
   @@unique([date, category, playerHash])
-  @@index([date])
+}
+
+model DailyAggregate {
+  id       Int     @id @default(autoincrement())
+  date     String
+  category String
+  won      Boolean
+  attempt  Int
+  count    Int     @default(0)
+
+  @@unique([date, category, won, attempt])
 }

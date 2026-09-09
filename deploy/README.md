@@ -1,12 +1,12 @@
 # Cloudflare free-tier deployment
 
-The production layout uses Cloudflare Workers for the Next.js site and API routes, Supabase PostgreSQL for player statistics and mirrored assignments, a private Cloudflare R2 bucket for the playlist catalog and 16-second MP3 clips, and GitHub Actions with a self-hosted Windows runner for the daily playlist job. The Worker reads daily challenges directly from R2, so a statistics database outage does not stop the game. The runner uses your home internet connection because YouTube blocks downloads from GitHub-hosted server addresses. Your computer only needs to be on when the daily job runs.
+The production layout uses Cloudflare Workers for the Next.js site and API routes, Supabase PostgreSQL for anonymous player statistics, a private Cloudflare R2 bucket for the playlist catalog and 16-second MP3 clips, and GitHub Actions with a self-hosted Windows runner for the daily playlist job. The Worker reads daily challenges directly from R2, so a statistics database outage does not stop the game. The runner uses your home internet connection because YouTube blocks downloads from GitHub-hosted server addresses. Your computer only needs to be on when the daily job runs.
 
 ## 1. Supabase
 
 In the Supabase project, open **Connect** and copy both pooler URLs:
 
-- **Session pooler**, port 5432: add this to GitHub as `SUPABASE_DATABASE_URL`. The daily job uses it for Prisma migrations and publishing.
+- **Session pooler**, port 5432: add this to GitHub as `SUPABASE_DATABASE_URL`. The daily job uses it for Prisma migrations.
 - **Transaction pooler**, port 6543: add this later as the Cloudflare Worker secret `DATABASE_URL`. Copy the complete URL shown by Supabase.
 
 Replace the password placeholder with the URL-encoded database password. Keep both URLs secret. The session pooler value already added to GitHub is the correct value for the daily job.
@@ -29,7 +29,7 @@ R2_SECRET_ACCESS_KEY
 R2_BUCKET_NAME
 ```
 
-Set `R2_BUCKET_NAME` to `balkanguess-audio`. The workflow in `.github/workflows/daily-playlist.yml` runs at 02:17 UTC and can also be started manually. It refreshes the three playlists, prepares two Zagreb calendar days, uploads new clips, and publishes the matching rows to Supabase.
+Set `R2_BUCKET_NAME` to `balkanguess-audio`. The workflow in `.github/workflows/daily-playlist.yml` runs at 02:17 UTC and can also be started manually. It applies database migrations, refreshes the three playlists, prepares two Zagreb calendar days, and uploads new clips and catalog state to R2. Supabase stores player statistics only; the optional `publish` command maintains a non-runtime catalog mirror.
 
 On the same page, open the **Variables** tab and add these repository variables:
 
@@ -78,7 +78,15 @@ npm run deploy:cloudflare
 
 Wrangler creates the `balkan-guess` Worker from `wrangler.jsonc`, uploads the vinext build, and attaches the existing `balkanguess-audio` bucket. Future deployments use the same command. Do not set `PLAYLIST_DEV`, `CATALOG_STORAGE`, or any R2 key on the Worker.
 
-The vinext adapter is currently a beta Cloudflare project, so keep its pinned versions in `package.json` and run `npm run build:cloudflare` when upgrading it.
+The bootstrap command also generates and uploads `GAME_TOKEN_SECRET`, which signs anonymous completion proofs. Existing deployments created before this secret was introduced must upload a random value of at least 32 characters before deploying the updated application:
+
+```powershell
+node node_modules/wrangler/bin/wrangler.js secret put GAME_TOKEN_SECRET --config wrangler.jsonc
+```
+
+Do not rotate this secret during an active challenge unless invalidating current browser progress is acceptable. The vinext adapter is currently a beta Cloudflare project, so keep its pinned versions in `package.json` and run `npm run build:cloudflare` when upgrading it.
+
+Before deploying this version over an existing installation, run the **Prepare daily songs** workflow once so the `DailyAggregate` migration is applied and existing statistics are backfilled. Deploy the Worker only after that workflow succeeds.
 
 ## 6. Validate production
 
@@ -88,10 +96,10 @@ Before replacing an existing public URL, verify:
 - `/api/daily?category=club-mix`, `jala-buba`, and `exyu` each report a prepared challenge.
 - Each category plays audio, accepts a guess, reveals the answer, and restores browser progress after reload.
 - `/api/daily/clip` serves only today's assigned private clip and supports browser range requests.
-- A second manual daily workflow run succeeds without replacing prepared assignments.
+- A second manual daily workflow run succeeds without replacing prepared assignments or rewriting an unchanged catalog.
 
 ## Maintenance
 
-Add tracks to the source YouTube playlists and let the next workflow import them. For a bad automatic intro boundary, run `npm run playlist -- start SONG_ID SECONDS` in a configured worker environment, followed by `prepare` and `publish`.
+Add tracks to the source YouTube playlists and let the next workflow import them. For a bad automatic intro boundary, run `npm run playlist -- start SONG_ID SECONDS` in a configured worker environment, followed by `prepare`. The optional `publish` command maintains a PostgreSQL catalog mirror, but production does not read that mirror and the scheduled workflow deliberately skips it.
 
 Prepared clips remain in R2 so old assignments and reused songs keep working. Back up `state/catalog.json` from R2 and the Supabase database together before manually repairing catalog data.

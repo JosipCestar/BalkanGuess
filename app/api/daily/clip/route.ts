@@ -3,6 +3,7 @@ import { categoryFrom } from "@/lib/categories";
 import { getDailySong } from "@/lib/daily";
 import { getCurrentChallengeDate } from "@/lib/challenge";
 import { localMode } from "@/lib/runtime";
+import { enforceActorAndIpRateLimits } from "@/lib/rate-limit";
 
 const VALID_CLIP_KEY = /^[a-zA-Z0-9_-]+\.mp3$/;
 
@@ -14,10 +15,10 @@ function parseRange(value: string | null, size: number) {
   return start >= 0 && start < size && end >= start ? { start, end } : undefined;
 }
 
-function audioHeaders(length: number) {
+function audioHeaders(length: number, cacheControl = "private, no-store") {
   return new Headers({
     "Accept-Ranges": "bytes",
-    "Cache-Control": "private, no-store",
+    "Cache-Control": cacheControl,
     "Content-Length": String(length),
     "Content-Type": "audio/mpeg",
   });
@@ -41,31 +42,27 @@ async function localClip(clipKey: string, rangeHeader: string | null) {
   return new Response(new Uint8Array(audio), { headers: audioHeaders(audio.length) });
 }
 
-async function workerClip(clipKey: string, rangeHeader: string | null) {
+async function workerClip(clipKey: string) {
   const { env } = await import("cloudflare:workers");
   const key = `clips/${clipKey}`;
-  const head = await env.AUDIO_BUCKET.head(key);
-  if (!head) return new Response(null, { status: 404 });
-  const range = parseRange(rangeHeader, head.size);
-  if (range === undefined) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${head.size}` } });
-  const object = await env.AUDIO_BUCKET.get(
-    key,
-    range ? { range: { offset: range.start, length: range.end - range.start + 1 } } : undefined,
-  );
+  const object = await env.AUDIO_BUCKET.get(key);
   if (!object) return new Response(null, { status: 404 });
-  const headers = audioHeaders(range ? range.end - range.start + 1 : object.size);
-  if (range) headers.set("Content-Range", `bytes ${range.start}-${range.end}/${head.size}`);
-  return new Response(object.body, { status: range ? 206 : 200, headers });
+  const headers = audioHeaders(object.size, "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800");
+  headers.set("ETag", object.httpEtag);
+  headers.set("Last-Modified", object.uploaded.toUTCString());
+  return new Response(object.body, { headers });
 }
 
 export async function GET(request: NextRequest) {
   try {
+    const limited = await enforceActorAndIpRateLimits(request, "MEDIA_RATE_LIMITER");
+    if (limited) return limited;
     const date = getCurrentChallengeDate();
     if (request.nextUrl.searchParams.get("date") !== date) return new Response(null, { status: 409 });
     const song = await getDailySong(date, categoryFrom(request.nextUrl.searchParams.get("category")));
     if (!song?.clipKey || !VALID_CLIP_KEY.test(song.clipKey)) return new Response(null, { status: 404 });
     return localMode()
       ? localClip(song.clipKey, request.headers.get("range"))
-      : workerClip(song.clipKey, request.headers.get("range"));
+      : workerClip(song.clipKey);
   } catch { return new Response(null, { status: 503 }); }
 }

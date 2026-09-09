@@ -10,7 +10,6 @@ import { categoryFrom, CATEGORIES } from "../lib/categories";
 import { playlistUrl, parseTrackTitle, dateOffset, automaticStartFromSegments, automaticStartFromSilenceLog } from "../lib/playlist";
 import { getCurrentChallengeDate, stableIndex } from "../lib/challenge";
 import { normalizeBalkanText } from "../lib/text";
-import { prisma } from "../lib/prisma";
 import { deleteR2Object, putR2Object, r2ObjectExists, remoteCatalogEnabled } from "../lib/r2";
 
 config({ path: ".env.playlist.local", quiet: true });
@@ -97,19 +96,27 @@ async function main() {
       const url = playlistUrl(process.argv[4] || "");
       const result = JSON.parse(await run(ytdlp, ["--ignore-config", "--flat-playlist", "--dump-single-json", "--skip-download", "--socket-timeout", "20", url]));
       let imported = 0, skipped = 0;
+      let changed = false;
       const review: Array<{ title: string; id: string }> = [];
       for (const entry of result.entries || []) {
         const parsed = parseTrackTitle(entry.title || "");
         if (!parsed || !/^[\w-]{11}$/.test(entry.id || "") || ["private", "needs_auth", "premium_only", "subscriber_only"].includes(entry.availability)) { skipped++; review.push({ title: entry.title, id: entry.id }); continue; }
         const sourceUrl = `https://www.youtube.com/watch?v=${entry.id}`;
         const existing = catalog.songs.find(song => song.sourceUrl === sourceUrl);
-        if (existing) { if (!existing.categories.includes(category)) existing.categories.push(category); continue; }
+        if (existing) {
+          if (!existing.categories.includes(category)) {
+            existing.categories.push(category);
+            changed = true;
+          }
+          continue;
+        }
         catalog.songs.push({ id: Math.max(0, ...catalog.songs.map(song => song.id)) + 1, ...parsed, sourceUrl, categories: [category], clipKey: null, previewStart: 0, soundcloudTrackId: null, soundcloudUrl: null, active: true });
         imported++;
+        changed = true;
       }
-      await writeCatalog(catalog);
+      if (changed) await writeCatalog(catalog);
       await writeFile(path.join(root, `review-${category}.json`), JSON.stringify(review, null, 2));
-      console.log(`Imported ${imported} songs into ${category}; skipped ${skipped} entries needing review. Review titles in data/catalog.json before publishing.`);
+      console.log(`Imported ${imported} songs into ${category}; skipped ${skipped} entries needing review.${changed ? " Catalog updated." : " Catalog unchanged."}`);
     } else if (command === "find") {
       const query = normalizeBalkanText(process.argv.slice(3).join(" "));
       if (!query) throw new Error("Enter an artist or song title to find.");
@@ -192,29 +199,34 @@ async function main() {
       }
       if (failures) throw new Error(`${failures} challenges could not be prepared. Existing assignments were retained.`);
     } else if (command === "publish") {
-      // Source URLs map development IDs to database IDs, preserving the legacy catalog.
-      const ids = new Map<number, number>();
-      for (let index = 0; index < catalog.songs.length; index += 100) {
-        const batch = catalog.songs.slice(index, index + 100);
-        const stored = await prisma.$transaction(batch.map(song => {
-          if (!song.sourceUrl) throw new Error(`Song ${song.id} has no source URL.`);
-          const { id: _localId, ...values } = song;
-          void _localId;
-          const data = { ...values, normalizedTitle: normalizeBalkanText(song.title), normalizedArtist: normalizeBalkanText(song.artist) };
-          return prisma.song.upsert({ where: { sourceUrl: song.sourceUrl }, create: data, update: data });
-        }));
-        stored.forEach((song, offset) => ids.set(batch[offset].id, song.id));
+      const { prisma } = await import("../lib/prisma");
+      try {
+        // Source URLs map development IDs to database IDs, preserving the legacy catalog.
+        const ids = new Map<number, number>();
+        for (let index = 0; index < catalog.songs.length; index += 100) {
+          const batch = catalog.songs.slice(index, index + 100);
+          const stored = await prisma.$transaction(batch.map(song => {
+            if (!song.sourceUrl) throw new Error(`Song ${song.id} has no source URL.`);
+            const { id: _localId, ...values } = song;
+            void _localId;
+            const data = { ...values, normalizedTitle: normalizeBalkanText(song.title), normalizedArtist: normalizeBalkanText(song.artist) };
+            return prisma.song.upsert({ where: { sourceUrl: song.sourceUrl }, create: data, update: data });
+          }));
+          stored.forEach((song, offset) => ids.set(batch[offset].id, song.id));
+        }
+        for (const [key, localId] of Object.entries(catalog.days)) {
+          const [date, category] = key.split(":");
+          const song = catalog.songs.find(song => song.id === localId);
+          if (!song?.clipKey) throw new Error(`Missing clip for ${key}`);
+          if (!await clipExists(song.clipKey)) throw new Error(`Missing clip for ${key}`);
+          const songId = ids.get(localId)!;
+          await prisma.dailySong.upsert({ where: { date_category: { date, category } }, create: { date, category, songId }, update: { songId } });
+        }
+        console.log("Published catalog and prepared assignments to PostgreSQL.");
+      } finally {
+        await prisma.$disconnect();
       }
-      for (const [key, localId] of Object.entries(catalog.days)) {
-        const [date, category] = key.split(":");
-        const song = catalog.songs.find(song => song.id === localId);
-        if (!song?.clipKey) throw new Error(`Missing clip for ${key}`);
-        if (!await clipExists(song.clipKey)) throw new Error(`Missing clip for ${key}`);
-        const songId = ids.get(localId)!;
-        await prisma.dailySong.upsert({ where: { date_category: { date, category } }, create: { date, category, songId }, update: { songId } });
-      }
-      console.log("Published catalog and prepared assignments to PostgreSQL.");
     } else throw new Error("Usage: playlist.ts import CATEGORY URL | find QUERY | start SONG_ID SECONDS | prepare [DAYS] | publish");
-  } finally { await lock.close(); await unlink(lockPath); await prisma.$disconnect(); }
+  } finally { await lock.close(); await unlink(lockPath); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

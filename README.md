@@ -21,7 +21,7 @@ Each category has its own daily song, attempts, saved browser progress, and anon
 | Area | Technology |
 | --- | --- |
 | Web application | Next.js 16, React 19, TypeScript |
-| Database | Supabase PostgreSQL with Prisma |
+| Database | Supabase PostgreSQL with Prisma for anonymous aggregate statistics |
 | Audio storage | Private Cloudflare R2 bucket bound directly to the Worker |
 | Daily worker | GitHub Actions, yt-dlp, FFmpeg, SponsorBlock intro markers |
 | Hosting | Cloudflare Workers through vinext |
@@ -50,7 +50,7 @@ Production uses Cloudflare Workers, Supabase, a private Cloudflare R2 bucket, an
 | `npm run dev:playlist` | Start isolated local playlist development |
 | `npm run playlist -- import CATEGORY URL` | Add or refresh a source playlist |
 | `npm run playlist -- prepare 2` | Prepare two days of MP3 clips |
-| `npm run playlist -- publish` | Publish catalog and assignments to PostgreSQL |
+| `npm run playlist -- publish` | Optionally mirror catalog and assignments to PostgreSQL |
 | `npm run playlist -- find QUERY` | Find a catalog song and its local ID |
 | `npm run playlist -- start ID SECONDS` | Override a song's clip starting point |
 | `npm test` | Run unit tests |

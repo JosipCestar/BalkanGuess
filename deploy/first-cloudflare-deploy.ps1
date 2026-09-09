@@ -7,6 +7,8 @@ if ($LASTEXITCODE -ne 0) { throw "Cloudflare build failed." }
 $secureDatabaseUrl = Read-Host "Paste the Supabase transaction pooler URL (port 6543)" -AsSecureString
 $secretPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureDatabaseUrl)
 $databaseUrl = $null
+$gameTokenSecret = $null
+$secretBytes = New-Object byte[] 32
 $secretFile = Join-Path ([IO.Path]::GetTempPath()) ("balkanguess-secrets-" + [guid]::NewGuid().ToString("N") + ".json")
 
 try {
@@ -18,7 +20,10 @@ try {
     throw "DATABASE_URL must be the complete Supabase transaction pooler URL using port 6543."
   }
 
-  $secretJson = @{ DATABASE_URL = $databaseUrl } | ConvertTo-Json -Compress
+  $random = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $random.GetBytes($secretBytes) } finally { $random.Dispose() }
+  $gameTokenSecret = [Convert]::ToBase64String($secretBytes)
+  $secretJson = @{ DATABASE_URL = $databaseUrl; GAME_TOKEN_SECRET = $gameTokenSecret } | ConvertTo-Json -Compress
   [IO.File]::WriteAllText($secretFile, $secretJson, [Text.UTF8Encoding]::new($false))
 
   Write-Host "Uploading the first Worker version with its database secret..."
@@ -27,5 +32,7 @@ try {
 } finally {
   if ($secretPointer -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($secretPointer) }
   $databaseUrl = $null
+  $gameTokenSecret = $null
+  [Array]::Clear($secretBytes, 0, $secretBytes.Length)
   if (Test-Path -LiteralPath $secretFile) { Remove-Item -LiteralPath $secretFile -Force }
 }

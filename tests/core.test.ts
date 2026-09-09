@@ -5,6 +5,10 @@ import { normalizeBalkanText } from "../lib/text";
 import { getSnippetEnd, hasReachedSnippetEnd, withActualPlaybackStart } from "../lib/audio/snippet";
 import { haveMatchingArtistCredit, parseArtistCredits } from "../lib/artist";
 import { isValidCompletedResult, summarizeDailyResults } from "../lib/daily-stats";
+import { dailySongFromCatalog } from "../lib/daily";
+import { signGameProof, verifyGameProof, type GameProof } from "../lib/game-proof";
+import { readJsonBody } from "../lib/http";
+import { signPlayerId, verifyPlayerCookie } from "../lib/player";
 describe("Balkan text normalization", () => { it("normalizes diacritics and punctuation", () => { expect(normalizeBalkanText(" Željko Joksimović ")).toBe("zeljko joksimovic"); expect(normalizeBalkanText("Đurđevdan")).toBe("djurdjevdan"); }); });
 describe("artist credit matching", () => {
   it("parses the collaboration styles used by the song catalog", () => {
@@ -20,6 +24,35 @@ describe("artist credit matching", () => {
   });
 });
 describe("daily challenge", () => { it("uses Zagreb date instead of browser offset", () => { expect(getCurrentChallengeDate(new Date("2026-08-28T22:30:00.000Z"))).toBe("2026-08-29"); }); it("chooses deterministic fallback", () => { expect(stableIndex("2026-08-29", 10)).toBe(stableIndex("2026-08-29", 10)); }); });
+describe("daily catalog lookup", () => {
+  it("uses an already loaded catalog without another backend read", () => {
+    const song = { id: 7, title: "Song", artist: "Artist", categories: ["club-mix"], sourceUrl: null, clipKey: "clip.mp3", previewStart: 0, soundcloudTrackId: null, soundcloudUrl: null, active: true };
+    expect(dailySongFromCatalog({ songs: [song], days: { "2026-08-29:club-mix": 7 } }, "2026-08-29", "club-mix")).toBe(song);
+  });
+});
+describe("signed game proof", () => {
+  const secret = "test-secret-that-is-longer-than-thirty-two-characters";
+  const proof: GameProof = { v: 1, playerId: "35d31996-b273-4169-92ce-d286cafa2518", date: "2026-08-29", category: "club-mix", attempt: 3, completed: false, won: false };
+  it("round-trips valid server state and rejects tampering", () => {
+    const token = signGameProof(proof, secret);
+    expect(verifyGameProof(token, secret)).toEqual(proof);
+    expect(verifyGameProof(`${token.slice(0, -1)}x`, secret)).toBeNull();
+  });
+});
+describe("signed anonymous player cookie", () => {
+  const secret = "test-secret-that-is-longer-than-thirty-two-characters";
+  const playerId = "35d31996-b273-4169-92ce-d286cafa2518";
+  it("accepts a server cookie and rejects a caller-invented identity", () => {
+    expect(verifyPlayerCookie(signPlayerId(playerId, secret), secret)).toBe(playerId);
+    expect(verifyPlayerCookie(playerId, secret)).toBeNull();
+  });
+});
+describe("bounded JSON bodies", () => {
+  it("parses JSON and rejects oversized declared bodies", async () => {
+    await expect(readJsonBody<{ ok: boolean }>(new Request("https://example.test", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"ok":true}' }))).resolves.toEqual({ ok: true });
+    await expect(readJsonBody(new Request("https://example.test", { method: "POST", headers: { "Content-Type": "application/json", "Content-Length": "3000" }, body: "{}" }))).rejects.toEqual(expect.objectContaining({ status: 413 }));
+  });
+});
 describe("game scoring and attempts", () => { it("progresses predictably", () => { expect(durationForAttempt(0)).toBe(1); expect(durationForAttempt(5)).toBe(16); expect(scoreForAttempt(0)).toBe(1000); expect(scoreForAttempt(5)).toBe(100); expect(canConsumeAttempt(5, false)).toBe(true); expect(canConsumeAttempt(6, false)).toBe(false); }); });
 describe("daily player statistics", () => {
   it("summarizes wins by attempt and losses", () => {

@@ -13,6 +13,7 @@ coverage
 *.log
 .DS_Store
 Thumbs.db
+/admin/
 
 data/
 .env.production

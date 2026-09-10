@@ -30,6 +30,7 @@ export function PersonalStats({ category, date, development, result }: {
   const [results, setResults] = useState<Partial<Record<Category, PersonalResult[]>>>({});
   const [storageAvailable, setStorageAvailable] = useState(true);
   const [today, setToday] = useState("");
+  const [closing, setClosing] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const prefix = `balkanguess:personal:v1:${development ? "preview:" : ""}${category}:`;
   const resultDate = result?.date, won = result?.won, attempt = result?.attempt;
@@ -59,13 +60,19 @@ export function PersonalStats({ category, date, development, result }: {
     const timer = setInterval(refresh, 60000);
     return () => { window.removeEventListener("storage", refresh); window.removeEventListener("focus", refresh); clearInterval(timer); };
   }, [prefix, resultDate, won, attempt, development]);
-  return <><div className="stats-toolbar"><NextSongCountdown date={date} /><button className="secondary" onClick={() => dialog.current?.showModal()}>YOUR STATS</button></div><dialog ref={dialog} className="dialog personal-dialog all-category-stats" aria-labelledby="personal-stats-title">
+  const open = () => { setClosing(false); dialog.current?.showModal(); };
+  const close = () => {
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(() => { dialog.current?.close(); setClosing(false); }, 180);
+  };
+  return <><div className="stats-toolbar"><NextSongCountdown date={date} /><button className="secondary" onClick={open}>YOUR STATS</button></div><dialog ref={dialog} className={`dialog personal-dialog all-category-stats${closing ? " is-closing" : ""}`} aria-labelledby="personal-stats-title" onCancel={event => { event.preventDefault(); close(); }}>
     <h2 id="personal-stats-title">Your stats</h2>
     <p className="muted">Your progress across every category</p>
     <div className="category-stats-grid">{CATEGORIES.map(item => <CategoryStats key={item.id} label={item.label} results={results[item.id] ?? []} today={today} />)}</div>
     <p className="stats-note">{storageAvailable ? `${development ? "Preview stats. " : ""}Saved in this browser. Win on consecutive days to build a streak in each category.` : "Browser storage is unavailable. Your stats cannot be saved."}</p>
     <NextSongCountdown date={date} />
-    <form method="dialog"><button className="secondary">CLOSE</button></form>
+    <form><button type="button" className="secondary" onClick={close}>CLOSE</button></form>
   </dialog></>;
 }
 

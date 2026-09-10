@@ -126,12 +126,18 @@ function ResultDialog({ game, number, stats, statsLoading, date, onClose, onShar
 }) {
   const answer = game.answer;
   const [showEmbed, setShowEmbed] = useState(false);
+  const [closing, setClosing] = useState(false);
   if (!answer) return null;
+  const close = () => {
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(onClose, 180);
+  };
   const embedUrl = answer.soundcloudUrl
     ? `https://w.soundcloud.com/player/?url=${encodeURIComponent(answer.soundcloudUrl)}&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&visual=false`
     : null;
 
-  return <div className="dialog-backdrop">
+  return <div className={`dialog-backdrop${closing ? " is-closing" : ""}`}>
     <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="result-title">
       <p className="eyebrow">BalkanGuess #{number}</p>
       <h2 id="result-title">{game.won ? "You got it!" : "Game over"}</h2>
@@ -155,7 +161,7 @@ function ResultDialog({ game, number, stats, statsLoading, date, onClose, onShar
       {answer.soundcloudUrl && <a className="track-link" href={answer.soundcloudUrl} target="_blank" rel="noreferrer">Open track on SoundCloud</a>}
       <div className="actions">
         <button className="secondary" onClick={onShare}>SHARE RESULT</button>
-        <button className="secondary" onClick={onClose}>CLOSE</button>
+        <button className="secondary" onClick={close}>CLOSE</button>
       </div>
     </section>
   </div>;

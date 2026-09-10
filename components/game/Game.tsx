@@ -6,6 +6,7 @@ import { AudioPlayer } from "./AudioPlayer";
 import { CATEGORIES, type Category } from "@/lib/categories";
 import { DURATIONS, scoreForAttempt } from "@/lib/game";
 import type { DailyStats } from "@/lib/daily-stats";
+import { PersonalStats } from "./PersonalStats";
 
 type Song = { id: number; artist: string; title: string };
 type Answer = { artist: string; title: string; sourceUrl?: string | null; soundcloudUrl?: string | null };
@@ -99,7 +100,10 @@ function DailyStatsPanel({ stats, loading }: { stats?: DailyStats; loading: bool
     <p className="stats-caption">Attempt number · completed players</p>
   </section>;
 }
-function ResultDialog({ game, number, stats, statsLoading, onClose, onShare }: {
+function ResultDialog({ game, number, stats, statsLoading, category, date, development, onClose, onShare }: {
+  category: Category;
+  date?: string;
+  development: boolean;
   game: Saved;
   number?: number;
   stats?: DailyStats;
@@ -121,6 +125,7 @@ function ResultDialog({ game, number, stats, statsLoading, onClose, onShare }: {
       <p className="song-answer">{answer.title}</p>
       <p className="muted">by {answer.artist}</p>
       {game.won && <p><strong>{scoreForAttempt(game.attempt - 1)} points</strong></p>}
+      <PersonalStats inline category={category} date={date} development={development} result={date ? { date, won: game.won, attempt: game.attempt } : undefined} />
       <DailyStatsPanel stats={stats} loading={statsLoading} />
       {embedUrl && !showEmbed && <button className="secondary" onClick={() => setShowEmbed(true)}>LOAD SOUNDCLOUD PLAYER</button>}
       {embedUrl && showEmbed && <iframe
@@ -333,6 +338,7 @@ function CategoryGame({ category }: { category: Category }) {
         </div>
         <p className="daily-number"><span>EP</span> #{number ?? "…"}</p>
       </header>
+      <PersonalStats category={category} date={date} development={development} result={date && game.completed && game.answer ? { date, won: game.won, attempt: game.attempt } : undefined} />
       {development && <div className="dev-notice"><p className="muted">Development preview · progress saved on this device · shared statistics disabled</p><button className="secondary" onClick={() => { setGame({ ...empty, proof: initialProof }); setQuery(""); setSelected(undefined); setResults([]); setError(""); setResultOpen(false); }}>RESET TEST ROUND</button></div>}
       {!ready && date && <p className="error" role="status">No prepared song in this category yet. Choose another category.</p>}
       <div className="card">
@@ -390,6 +396,6 @@ function CategoryGame({ category }: { category: Category }) {
         {game.completed && game.answer && !resultOpen && <button className="secondary show-result" onClick={() => setResultOpen(true)}>SHOW RESULT</button>}
       </div>
     </section>
-    {game.completed && resultOpen && <ResultDialog game={game} number={number} stats={stats} statsLoading={statsLoading} onClose={() => setResultOpen(false)} onShare={() => void share()} />}
+    {game.completed && resultOpen && <ResultDialog game={game} number={number} stats={stats} statsLoading={statsLoading} category={category} date={date} development={development} onClose={() => setResultOpen(false)} onShare={() => void share()} />}
   </>;
 }

@@ -526,3 +526,21 @@ input:focus { border-color: var(--accent); background: #0b0d08; box-shadow: 0 0 
 
 .category-tabs { display:flex; gap:10px; flex-wrap:wrap; max-width:680px; margin:20px auto; justify-content:center; }
 .category-tabs button[aria-pressed=true] { background:#ffdf6b; color:#141414; border-color:#ffdf6b; }
+
+.stats-toolbar { display: flex; align-items: center; gap: 16px; margin: -8px 0 24px; }
+.stats-toolbar > .secondary { flex: 0 0 auto; }
+.next-song { display: grid; gap: 5px; flex: 1; margin: 18px 0; }
+.next-song span { color: var(--muted); font-size: .68rem; }
+.next-song strong { color: var(--accent); font-size: 1.15rem; font-variant-numeric: tabular-nums; letter-spacing: .06em; }
+.stats-toolbar .next-song { margin: 0; }
+.personal-dialog { color: var(--text); }
+.personal-dialog::backdrop { background: rgb(0 0 0 / 88%); backdrop-filter: blur(12px); }
+.personal-dialog form .secondary { width: 100%; }
+.personal-stats { margin: 22px 0; text-align: left; }
+.personal-stats h2 { margin: 8px 0 18px; font-size: 1.2rem; }
+.personal-stats h3 { margin: 22px 0 12px; font-size: .8rem; }
+.personal-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.personal-metrics div { display: flex; flex-direction: column-reverse; gap: 5px; padding: 12px; border: 1px solid var(--border); }
+.personal-metrics dt { color: var(--muted); font-size: .7rem; }
+.personal-metrics dd { margin: 0; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.stats-note, .personal-stats > .muted { color: var(--muted); font-size: .72rem; line-height: 1.6; }

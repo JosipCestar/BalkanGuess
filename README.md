@@ -1,5 +1,9 @@
 # BalkanGuess
 
+The separate Windows admin app is launched with `npm run admin` or
+`admin/Start Admin.cmd`. See [admin setup](admin/README.md) for community
+statistics, catalog health checks, and song preparation.
+
 BalkanGuess is a daily music-guessing game for fans of Balkan music. Each day
 offers a new song in every category and challenges players to identify it from
 an increasingly longer audio clip.
@@ -22,6 +26,12 @@ players can enjoy each challenge independently.
 BalkanGuess saves a player's in-progress round in their browser. It also
 collects anonymous aggregate results to show how the community performed, with
 no account required to play.
+
+Personal stats track games played, win rate, current and best winning streaks,
+and guess distribution for each category in this browser. Each completed daily
+round counts once; a loss or missed day breaks the streak. Preview stats are
+stored separately. Clearing browser data clears personal stats. The next-song
+countdown follows Zagreb midnight, including daylight-saving changes.
 
 ## Music rights
 

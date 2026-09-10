@@ -31,6 +31,7 @@ export function PersonalStats({ category, date, development, result }: {
   const [storageAvailable, setStorageAvailable] = useState(true);
   const [today, setToday] = useState("");
   const [closing, setClosing] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<Category>(category);
   const dialog = useRef<HTMLDialogElement>(null);
   const prefix = `balkanguess:personal:v1:${development ? "preview:" : ""}${category}:`;
   const resultDate = result?.date, won = result?.won, attempt = result?.attempt;
@@ -60,19 +61,29 @@ export function PersonalStats({ category, date, development, result }: {
     const timer = setInterval(refresh, 60000);
     return () => { window.removeEventListener("storage", refresh); window.removeEventListener("focus", refresh); clearInterval(timer); };
   }, [prefix, resultDate, won, attempt, development]);
-  const open = () => { setClosing(false); dialog.current?.showModal(); };
+  const open = () => { setActiveCategory(category); setClosing(false); dialog.current?.showModal(); };
   const close = () => {
     if (closing) return;
     setClosing(true);
     window.setTimeout(() => { dialog.current?.close(); setClosing(false); }, 180);
   };
-  return <><div className="stats-toolbar"><NextSongCountdown date={date} /><button className="secondary" onClick={open}>YOUR STATS</button></div><dialog ref={dialog} className={`dialog personal-dialog all-category-stats${closing ? " is-closing" : ""}`} aria-labelledby="personal-stats-title" onCancel={event => { event.preventDefault(); close(); }}>
-    <h2 id="personal-stats-title">Your stats</h2>
-    <p className="muted">Your progress across every category</p>
-    <div className="category-stats-grid">{CATEGORIES.map(item => <CategoryStats key={item.id} label={item.label} results={results[item.id] ?? []} today={today} />)}</div>
-    <p className="stats-note">{storageAvailable ? `${development ? "Preview stats. " : ""}Saved in this browser. Win on consecutive days to build a streak in each category.` : "Browser storage is unavailable. Your stats cannot be saved."}</p>
-    <NextSongCountdown date={date} />
-    <form><button type="button" className="secondary" onClick={close}>CLOSE</button></form>
+  const active = CATEGORIES.find(item => item.id === activeCategory) ?? CATEGORIES[0];
+  return <><div className="stats-toolbar"><button className="secondary" onClick={open}>YOUR STATS</button></div><dialog ref={dialog} className={`dialog personal-dialog all-category-stats${closing ? " is-closing" : ""}`} aria-labelledby="personal-stats-title" onCancel={event => { event.preventDefault(); close(); }}>
+    <div className="stats-dialog-head">
+      <div><h2 id="personal-stats-title">Your stats</h2><p className="muted">Switch category to compare your progress.</p></div>
+      <button type="button" className="stats-close" onClick={close} aria-label="Close stats">×</button>
+    </div>
+    <div className="stats-category-tabs" role="tablist" aria-label="Statistics category">
+      {CATEGORIES.map(item => <button key={item.id} id={`stats-tab-${item.id}`} type="button" role="tab" aria-selected={activeCategory === item.id} aria-controls="stats-category-panel" onClick={() => setActiveCategory(item.id)}>{item.label}</button>)}
+    </div>
+    <div id="stats-category-panel" role="tabpanel" aria-labelledby={`stats-tab-${active.id}`}>
+      <CategoryStats label={active.label} results={results[active.id] ?? []} today={today} />
+    </div>
+    <div className="stats-dialog-footer">
+      <p className="stats-note">{storageAvailable ? `${development ? "Preview stats · " : ""}Saved on this device.` : "Browser storage is unavailable."}</p>
+      <NextSongCountdown date={date} />
+      <form><button type="button" className="secondary" onClick={close}>DONE</button></form>
+    </div>
   </dialog></>;
 }
 

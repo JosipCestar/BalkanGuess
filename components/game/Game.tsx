@@ -168,7 +168,19 @@ function ResultDialog({ game, number, stats, statsLoading, date, onClose, onShar
 }
 export function Game() {
   const [category, setCategory] = useState<Category>("club-mix");
-  return <><nav className="category-tabs" aria-label="Music categories">{CATEGORIES.map(item => <button key={item.id} className="secondary" aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</nav><CategoryGame key={category} category={category} /></>;
+  return <div className="game-shell">
+    <nav className="category-tabs" aria-label="Music categories">
+      <span className="category-tabs-label">Choose your frequency</span>
+      <div className="category-tab-list">{CATEGORIES.map(item => <button key={item.id} className="secondary" aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>
+      <label className="category-select">
+        <span>Music category</span>
+        <select value={category} onChange={event => setCategory(event.target.value as Category)}>
+          {CATEGORIES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select>
+      </label>
+    </nav>
+    <CategoryGame key={category} category={category} />
+  </div>;
 }
 function CategoryGame({ category }: { category: Category }) {
   const [ready, setReady] = useState(false);
@@ -364,10 +376,22 @@ function CategoryGame({ category }: { category: Category }) {
         </div>
         <p className="daily-number"><span>EP</span> #{number ?? "…"}</p>
       </header>
-      <PersonalStats category={category} date={date} development={development} result={date && game.completed && game.answer ? { date, won: game.won, attempt: game.attempt } : undefined} />
-      {development && <div className="dev-notice"><p className="muted">Development preview · progress saved on this device · shared statistics disabled</p><button className="secondary" onClick={() => { setGame({ ...empty, proof: initialProof }); setQuery(""); setSelected(undefined); setResults([]); setError(""); setResultOpen(false); }}>RESET TEST ROUND</button></div>}
-      {!ready && date && <p className="error" role="status">No prepared song in this category yet. Choose another category.</p>}
-      <div className="card">
+      <div className="game-layout">
+        <aside className="broadcast-panel">
+          <div className="broadcast-status"><span aria-hidden="true" /> Live daily challenge</div>
+          <p className="broadcast-number"><span>EP</span>{number === undefined ? "—" : String(number).padStart(3, "0")}</p>
+          <p className="broadcast-copy">Listen closely. The clip gets longer after every miss.</p>
+          <ol className="broadcast-steps">
+            <li><span>01</span> Play the snippet</li>
+            <li><span>02</span> Name the track</li>
+            <li><span>03</span> Solve it in six</li>
+          </ol>
+          <PersonalStats category={category} date={date} development={development} result={date && game.completed && game.answer ? { date, won: game.won, attempt: game.attempt } : undefined} />
+        </aside>
+        <div className="play-panel">
+          {development && <div className="dev-notice"><p className="muted">Development preview · progress saved on this device · shared statistics disabled</p><button className="secondary" onClick={() => { setGame({ ...empty, proof: initialProof }); setQuery(""); setSelected(undefined); setResults([]); setError(""); setResultOpen(false); }}>RESET TEST ROUND</button></div>}
+          {!ready && date && <p className="error" role="status">No prepared song in this category yet. Choose another category.</p>}
+          <div className="card">
         <div className="card-kicker"><span>Mystery track</span><span>6 tries</span></div>
         <div className="mystery" aria-label="Hidden song title">?????</div>
         <p className="muted">Attempt {Math.min(game.attempt + 1, 6)} of 6 · {duration} second snippet</p>
@@ -421,6 +445,9 @@ function CategoryGame({ category }: { category: Category }) {
           {game.entries.map((entry, index) => <li key={index} className={entry.type}>{entry.type === "skip" ? "⬛ Skipped" : entry.type === "correct" ? `✓ ${entry.song?.artist} – ${entry.song?.title}` : entry.type === "artist" ? `🟨 Artist match · ${entry.song?.artist} – ${entry.song?.title}` : `✕ ${entry.song?.artist} – ${entry.song?.title}`}</li>)}
         </ul>
         {game.completed && game.answer && !resultOpen && <button className="secondary show-result" onClick={() => setResultOpen(true)}>SHOW RESULT</button>}
+          </div>
+          <div className="round-countdown"><NextSongCountdown date={date} /></div>
+        </div>
       </div>
     </section>
     {game.completed && resultOpen && <ResultDialog game={game} number={number} stats={stats} statsLoading={statsLoading} date={date} onClose={() => setResultOpen(false)} onShare={() => void share()} />}

@@ -240,10 +240,6 @@ function CategoryGame({ category }: { category: Category }) {
   }, [date, game.completed, game.answer, game.attempt, game.proof, category, initialProof]);
 
   useEffect(() => {
-    if (game.completed && game.answer) setResultOpen(true);
-  }, [game.completed, game.answer]);
-
-  useEffect(() => {
     if (!date || game.attempt === 0) return;
     const controller = new AbortController();
     const completedResult = game.completed && Boolean(game.answer) && Boolean(game.proof);
@@ -264,7 +260,11 @@ function CategoryGame({ category }: { category: Category }) {
       setStats(value);
     }).catch(error => {
       if (!(error instanceof DOMException && error.name === "AbortError")) setStats(undefined);
-    }).finally(() => { if (!controller.signal.aborted) setStatsLoading(false); });
+    }).finally(() => {
+      if (controller.signal.aborted) return;
+      setStatsLoading(false);
+      if (game.completed && game.answer) setResultOpen(true);
+    });
     return () => controller.abort();
   }, [date, game.attempt, game.completed, game.answer, game.proof, category]);
 

@@ -24,10 +24,10 @@ export function NextSongCountdown({ date }: { date?: string }) {
   return <div className="next-song">{available ? <button className="secondary" onClick={() => window.location.reload()}>LOAD TODAY’S CHALLENGE</button> : <><span>Next song · Zagreb midnight</span><strong>{time}</strong></>}</div>;
 }
 
-export function PersonalStats({ category, date, development, result, inline = false }: {
-  category: Category; date?: string; development: boolean; result?: PersonalResult; inline?: boolean;
+export function PersonalStats({ category, date, development, result }: {
+  category: Category; date?: string; development: boolean; result?: PersonalResult;
 }) {
-  const [results, setResults] = useState<PersonalResult[]>([]);
+  const [results, setResults] = useState<Partial<Record<Category, PersonalResult[]>>>({});
   const [storageAvailable, setStorageAvailable] = useState(true);
   const [today, setToday] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
@@ -41,12 +41,13 @@ export function PersonalStats({ category, date, development, result, inline = fa
           const key = prefix + resultDate;
           if (!parsePersonalResult(localStorage.getItem(key))) localStorage.setItem(key, JSON.stringify({ date: resultDate, won, attempt }));
         }
-        const saved: PersonalResult[] = [];
+        const saved: Partial<Record<Category, PersonalResult[]>> = {};
         for (let index = 0; index < localStorage.length; index++) {
           const key = localStorage.key(index);
-          if (!key?.startsWith(prefix)) continue;
+          const owner = CATEGORIES.find(item => key?.startsWith(`balkanguess:personal:v1:${development ? "preview:" : ""}${item.id}:`));
+          if (!owner || !key) continue;
           const value = parsePersonalResult(localStorage.getItem(key));
-          if (value && key === prefix + value.date) saved.push(value);
+          if (value && key === `balkanguess:personal:v1:${development ? "preview:" : ""}${owner.id}:${value.date}`) (saved[owner.id] ??= []).push(value);
         }
         setResults(saved);
         setStorageAvailable(true);
@@ -57,19 +58,25 @@ export function PersonalStats({ category, date, development, result, inline = fa
     window.addEventListener("focus", refresh);
     const timer = setInterval(refresh, 60000);
     return () => { window.removeEventListener("storage", refresh); window.removeEventListener("focus", refresh); clearInterval(timer); };
-  }, [prefix, resultDate, won, attempt]);
+  }, [prefix, resultDate, won, attempt, development]);
+  return <><div className="stats-toolbar"><NextSongCountdown date={date} /><button className="secondary" onClick={() => dialog.current?.showModal()}>YOUR STATS</button></div><dialog ref={dialog} className="dialog personal-dialog all-category-stats" aria-labelledby="personal-stats-title">
+    <h2 id="personal-stats-title">Your stats</h2>
+    <p className="muted">Your progress across every category</p>
+    <div className="category-stats-grid">{CATEGORIES.map(item => <CategoryStats key={item.id} label={item.label} results={results[item.id] ?? []} today={today} />)}</div>
+    <p className="stats-note">{storageAvailable ? `${development ? "Preview stats. " : ""}Saved in this browser. Win on consecutive days to build a streak in each category.` : "Browser storage is unavailable. Your stats cannot be saved."}</p>
+    <NextSongCountdown date={date} />
+    <form method="dialog"><button className="secondary">CLOSE</button></form>
+  </dialog></>;
+}
+
+function CategoryStats({ label, results, today }: { label: string; results: PersonalResult[]; today: string }) {
   const stats = summarizePersonalResults(results, today);
   const maximum = Math.max(1, ...stats.attempts);
-  const panel = <section className="personal-stats" aria-label="Your statistics">
-    <p className="eyebrow">{CATEGORIES.find(item => item.id === category)?.label}</p>
-    <h2>Your stats</h2>
+  return <section className="personal-stats" aria-label={`${label} statistics`}>
+    <h3 className="category-stats-title">{label}</h3>
     <dl className="personal-metrics">{[[stats.played, "Played"], [`${stats.winRate}%`, "Win rate"], [stats.currentStreak, "Current streak"], [stats.bestStreak, "Best streak"]].map(([value, label]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-    <h3>Guess distribution</h3>
+    <h4>Guess distribution</h4>
     <div className="stats-chart">{stats.attempts.map((count, index) => <div className="stat-row" key={index} aria-label={`${count} wins in ${index + 1} guesses`}><span>{index + 1}</span><span className="stat-track"><span className="stat-fill" style={{ width: `${count / maximum * 100}%` }} /></span><strong>{count}</strong></div>)}</div>
     {!stats.played && <p className="muted">Finish a daily challenge to start your stats.</p>}
-    <p className="stats-note">{storageAvailable ? `${development ? "Preview stats. " : ""}Saved in this browser. Win on consecutive days to build a streak.` : "Browser storage is unavailable. Your stats cannot be saved."}</p>
-    <NextSongCountdown date={date} />
   </section>;
-  if (inline) return panel;
-  return <><div className="stats-toolbar"><NextSongCountdown date={date} /><button className="secondary" onClick={() => dialog.current?.showModal()}>YOUR STATS</button></div><dialog ref={dialog} className="dialog personal-dialog" aria-label="Your personal statistics">{panel}<form method="dialog"><button className="secondary">CLOSE</button></form></dialog></>;
 }

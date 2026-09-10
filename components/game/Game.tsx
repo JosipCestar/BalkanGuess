@@ -74,17 +74,32 @@ function loadDaily(category: Category) {
   return request;
 }
 
-function DailyStatsPanel({ stats, loading }: { stats?: DailyStats; loading: boolean }) {
+function DailyStatsPanel({ stats, loading, game }: { stats?: DailyStats; loading: boolean; game?: Saved }) {
   if (loading) return <section className="daily-stats" aria-live="polite"><p className="muted">Loading today’s results…</p></section>;
   if (!stats) return null;
 
   const percentage = (count: number) => stats.totalPlayers ? `${Math.max((count / stats.totalPlayers) * 100, count ? 3 : 0)}%` : "0%";
+  const comparison = (() => {
+    if (!game || !stats.totalPlayers) return stats.totalPlayers ? null : "Be the first completed player in today’s comparison.";
+    if (!game.completed) {
+      const earlier = stats.attempts.slice(0, game.attempt).reduce((sum, count) => sum + count, 0);
+      return `${earlier} completed ${earlier === 1 ? "player has" : "players have"} solved before attempt ${Math.min(game.attempt + 1, 6)}.`;
+    }
+    if (!game.won) {
+      const rate = Math.round(stats.losses / stats.totalPlayers * 100);
+      return `${rate}% of completed players also reached the end without solving it.`;
+    }
+    const asEarly = stats.attempts.slice(0, game.attempt).reduce((sum, count) => sum + count, 0);
+    const rate = Math.round(asEarly / stats.totalPlayers * 100);
+    return `You solved it on attempt ${game.attempt}. ${rate}% of completed players solved it this early.`;
+  })();
 
-  return <section className="daily-stats" aria-labelledby="daily-stats-title">
+  return <section className="daily-stats" aria-label="Today’s player comparison">
     <div className="daily-stats-heading">
       <h3 id="daily-stats-title">Today’s players</h3>
       <p><strong>{stats.solvedPlayers}</strong> of <strong>{stats.totalPlayers}</strong> solved</p>
     </div>
+    {comparison && <p className="player-comparison">{comparison}</p>}
     <div className="stats-chart" aria-label="Completed rounds by attempt">
       {stats.attempts.map((count, index) => <div className="stat-row" key={index} aria-label={`${count} players solved on attempt ${index + 1}`}>
         <span>{index + 1}</span>
@@ -123,7 +138,7 @@ function ResultDialog({ game, number, stats, statsLoading, date, onClose, onShar
       <p className="song-answer">{answer.title}</p>
       <p className="muted">by {answer.artist}</p>
       {game.won && <p><strong>{scoreForAttempt(game.attempt - 1)} points</strong></p>}
-      <DailyStatsPanel stats={stats} loading={statsLoading} />
+      <DailyStatsPanel stats={stats} loading={statsLoading} game={game} />
       <NextSongCountdown date={date} />
       {embedUrl && !showEmbed && <button className="secondary" onClick={() => setShowEmbed(true)}>LOAD SOUNDCLOUD PLAYER</button>}
       {embedUrl && showEmbed && <iframe
@@ -211,22 +226,29 @@ function CategoryGame({ category }: { category: Category }) {
   }, [game.completed, game.answer]);
 
   useEffect(() => {
-    if (!date || !game.completed || !game.answer || !game.proof || development) return;
+    if (!date || game.attempt === 0) return;
+    const controller = new AbortController();
+    const completedResult = game.completed && Boolean(game.answer) && Boolean(game.proof);
     setStatsLoading(true);
     const reportedKey = `balkanguess:stats:v1:${category}:${date}`;
     const reported = localStorage.getItem(reportedKey) === "1";
-    fetch(reported ? `/api/daily/stats?category=${category}&date=${date}` : "/api/daily/stats", {
-      method: reported ? "GET" : "POST",
-      headers: reported ? undefined : { "Content-Type": "application/json" },
-      body: reported ? undefined : JSON.stringify({ proof: game.proof }),
+    const shouldReport = completedResult && !reported;
+    fetch(shouldReport ? "/api/daily/stats" : `/api/daily/stats?category=${category}&date=${date}`, {
+      method: shouldReport ? "POST" : "GET",
+      headers: shouldReport ? { "Content-Type": "application/json" } : undefined,
+      body: shouldReport ? JSON.stringify({ proof: game.proof }) : undefined,
+      signal: controller.signal,
     }).then(response => {
       if (!response.ok) throw new Error("Could not load stats.");
       return response.json() as Promise<DailyStats>;
     }).then(value => {
-      if (!reported) localStorage.setItem(reportedKey, "1");
+      if (shouldReport) localStorage.setItem(reportedKey, "1");
       setStats(value);
-    }).catch(() => undefined).finally(() => setStatsLoading(false));
-  }, [date, game.completed, game.answer, game.proof, category, development]);
+    }).catch(error => {
+      if (!(error instanceof DOMException && error.name === "AbortError")) setStats(undefined);
+    }).finally(() => { if (!controller.signal.aborted) setStatsLoading(false); });
+    return () => controller.abort();
+  }, [date, game.attempt, game.completed, game.answer, game.proof, category]);
 
   useEffect(() => {
     if (query.trim().length < 2 || selected) { setResults([]); return; }
@@ -388,6 +410,7 @@ function CategoryGame({ category }: { category: Category }) {
             return <div key={index} className={`attempt ${className}`} title={label} aria-label={label}>{entry?.type === "skip" ? "SKIP" : entry?.type === "correct" ? "✓" : entry?.type === "artist" ? "≈" : entry ? "×" : index + 1}</div>;
           })}
         </div>
+        {game.attempt > 0 && <DailyStatsPanel stats={stats} loading={statsLoading} game={game} />}
         <ul className="history">
           {game.entries.map((entry, index) => <li key={index} className={entry.type}>{entry.type === "skip" ? "⬛ Skipped" : entry.type === "correct" ? `✓ ${entry.song?.artist} – ${entry.song?.title}` : entry.type === "artist" ? `🟨 Artist match · ${entry.song?.artist} – ${entry.song?.title}` : `✕ ${entry.song?.artist} – ${entry.song?.title}`}</li>)}
         </ul>

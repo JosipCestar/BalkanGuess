@@ -1397,6 +1397,52 @@ input:focus {
   .audio-controls { margin-top: clamp(20px, 6vw, 26px); }
   .play { min-height: 64px; }
   .volume-control { grid-template-columns: 58px minmax(0, 1fr) 38px; gap: 8px; }
+  .volume-control input[type="range"] {
+    width: 100%;
+    height: 32px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    touch-action: pan-y;
+  }
+  .volume-control input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 7px;
+    border-radius: 99px;
+    background: linear-gradient(to right, var(--accent) 0 var(--volume-position), #343438 var(--volume-position) 100%);
+  }
+  .volume-control input[type="range"]::-webkit-slider-thumb {
+    width: 21px;
+    height: 21px;
+    margin-top: -7px;
+    border: 3px solid #080808;
+    border-radius: 50%;
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgb(223 242 15 / 24%);
+  }
+  .volume-control input[type="range"]::-moz-range-track {
+    height: 7px;
+    border-radius: 99px;
+    background: #343438;
+  }
+  .volume-control input[type="range"]::-moz-range-progress {
+    height: 7px;
+    border-radius: 99px;
+    background: var(--accent);
+  }
+  .volume-control input[type="range"]::-moz-range-thumb {
+    width: 15px;
+    height: 15px;
+    border: 3px solid #080808;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgb(223 242 15 / 24%);
+  }
   .actions { flex-direction: column-reverse; }
   .actions .secondary { min-height: 50px; }
   .dialog .actions { flex-direction: column; }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useState, type CSSProperties } from "react";
 import { useSnippetPlayback } from "./useSnippetPlayback";
 
 const VOLUME_STORAGE_KEY = "balkanguess:volume";
@@ -88,10 +88,11 @@ export function AudioPlayer({
           type="range"
           min="0"
           max="100"
-          step="5"
+          step="1"
           value={Math.round(volume * 100)}
           onChange={event => changeVolume(event.target.value)}
           aria-valuetext={`${Math.round(volume * 100)} percent`}
+          style={{ "--volume-position": `${Math.round(volume * 100)}%` } as CSSProperties}
         />
         <span aria-hidden="true">{Math.round(volume * 100)}%</span>
       </div>

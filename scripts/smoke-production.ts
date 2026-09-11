@@ -12,6 +12,14 @@ async function get(path: string, headers?: HeadersInit) {
   return { response, body };
 }
 
+async function requireByteRange(path: string) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const clip = await get(path, { Range: "bytes=0-0" });
+    if (clip.response.status === 206 && clip.response.headers.get("content-range")?.startsWith("bytes 0-0/")) return;
+  }
+  throw new Error(`${path} does not honor byte ranges after a bounded retry.`);
+}
+
 const health = await get("/api/health");
 if (JSON.parse(health.body).status !== "ok") throw new Error("Liveness check returned an unexpected response.");
 const readiness = await get("/api/readiness");
@@ -22,10 +30,7 @@ for (const category of ["club-mix", "jala-buba", "exyu"]) {
   const challenge = JSON.parse(daily.body) as { ready?: boolean; date?: string; audioUrl?: string };
   if (!challenge.ready || !challenge.date || !challenge.audioUrl) throw new Error(`${category} is not ready.`);
   await get(`/api/daily/stats?category=${category}&date=${challenge.date}`);
-  const clip = await get(challenge.audioUrl, { Range: "bytes=0-0" });
-  if (clip.response.status !== 206 || !clip.response.headers.get("content-range")?.startsWith("bytes 0-0/")) {
-    throw new Error(`${category} clip does not honor byte ranges.`);
-  }
+  await requireByteRange(challenge.audioUrl);
 }
 
 console.log(`Production smoke checks passed for ${baseUrl.origin}.`);

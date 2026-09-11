@@ -121,5 +121,6 @@ The `Monitor production readiness` workflow also checks `/api/readiness` every 3
 Add tracks to the source YouTube playlists and let the next workflow import them. For a bad automatic intro boundary, run `npm run playlist -- start SONG_ID SECONDS` in a configured worker environment, followed by `prepare`. The optional `publish` command maintains a PostgreSQL catalog mirror, but production does not read that mirror and the scheduled workflow deliberately skips it.
 
 Playlist imports accept both `youtube.com` and `music.youtube.com` playlist links. YouTube Music extraction currently resolves through the equivalent standard YouTube playlist, so playlists must be public or unlisted and accessible without an interactive account session on the runner.
+The optional Trap import is allowed to warn without blocking preparation of the established categories; Trap becomes part of readiness coverage as soon as its first song is imported.
 
 Prepared clips remain in R2 so old assignments and reused songs keep working. Back up `state/catalog.json` from R2 and the Supabase database together before manually repairing catalog data.

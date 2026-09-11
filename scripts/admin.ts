@@ -57,17 +57,35 @@ async function health() {
         status = await clips.get(key)!;
       }
     }
-    rows.push({ Date: date, Category: category.label, Song: song ? `${song.artist} - ${song.title}` : "-", Status: status });
+    rows.push({ Date: date, Category: category.label, SongId: song?.id ?? "", Song: song ? `${song.artist} - ${song.title}` : "-", Link: song?.sourceUrl ?? "", Start: song?.previewStart ?? "", Status: status });
   }
   return rows;
 }
 
 async function community() {
-  if (!process.env.DATABASE_URL) return { status: "Not configured: set DATABASE_URL in .env", rows: [] };
+  if (!process.env.DATABASE_URL) return { status: "Not configured: set DATABASE_URL in .env", summary: [], rows: [] };
   const { createPrismaClient } = await import("../lib/prisma-client");
   const client = createPrismaClient();
   try {
-    const groups = await client.dailyAggregate.findMany({ where: { date: { gte: dateOffset(today, -29), lte: today } } });
+    const groups = await client.dailyAggregate.findMany({
+      where: { date: { lte: today } },
+      select: { date: true, category: true, won: true, attempt: true, count: true },
+    });
+    const summary = [];
+    for (const range of [
+      { label: "Today", since: today },
+      { label: "Last 7 days", since: dateOffset(today, -6) },
+      { label: "Last 30 days", since: dateOffset(today, -29) },
+      { label: "All time", since: "0000-00-00" },
+    ]) {
+      for (const category of [{ id: "all", label: "All categories" }, ...CATEGORIES]) {
+        const matching = groups.filter(group => group.date >= range.since && (category.id === "all" || group.category === category.id));
+        const stats = summarizeDailyResults(matching);
+        summary.push({ Range: range.label, Category: category.label, Completed: stats.totalPlayers, Solved: stats.solvedPlayers, Losses: stats.losses,
+          "Win %": stats.totalPlayers ? Math.round(stats.solvedPlayers / stats.totalPlayers * 100) : 0,
+          ...Object.fromEntries(stats.attempts.map((count, index) => [`Guess ${index + 1}`, count])) });
+      }
+    }
     const rows = [];
     for (let offset = 0; offset < 30; offset++) for (const category of CATEGORIES) {
       const date = dateOffset(today, -offset);
@@ -76,8 +94,12 @@ async function community() {
         "Win %": stats.totalPlayers ? Math.round(stats.solvedPlayers / stats.totalPlayers * 100) : 0,
         ...Object.fromEntries(stats.attempts.map((count, index) => [`Guess ${index + 1}`, count])) });
     }
-    return { status: "Connected database - last 30 Zagreb dates. Counts are completed rounds, not unique visitors.", rows };
-  } catch { return { status: "Database unavailable. Check DATABASE_URL, connectivity, and migrations.", rows: [] }; }
+    const completed = summary.find(row => row.Range === "All time" && row.Category === "All categories")?.Completed ?? 0;
+    const status = completed
+      ? `Connected database - ${completed} completed ${completed === 1 ? "round" : "rounds"} recorded all time. Counts are not unique visitors.`
+      : "Connected database - no completed rounds have been recorded yet. Stats appear after a player finishes a production challenge.";
+    return { status, summary, rows };
+  } catch { return { status: "Database unavailable. Check DATABASE_URL, connectivity, and migrations.", summary: [], rows: [] }; }
   finally { await client.$disconnect(); }
 }
 
@@ -96,21 +118,40 @@ async function snapshot() {
   console.log(JSON.stringify({ checkedAt: new Date().toISOString(), catalog, community: stats, tools, locked }));
 }
 
-async function prepare() {
-  console.log(`Preparing ${days} days in ${target}. ${target === "r2" ? "Live R2 catalog and clips will be updated." : "Local catalog and clips only."}`);
-  const child = spawn(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/playlist.ts", "prepare", String(days)], { shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
-  // Keep configured credentials out of the UI log, including split output chunks.
+async function runPlaylist(args: string[]) {
+  const child = spawn(process.execPath, ["node_modules/tsx/dist/cli.mjs", "scripts/playlist.ts", ...args], { shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
   const secrets = Object.entries(process.env).filter(([key, value]) => /SECRET|TOKEN|PASSWORD|DATABASE_URL|ACCESS_KEY/.test(key) && value && value.length > 3).map(([, value]) => value!);
-  for (const stream of [child.stdout!, child.stderr!]) {
+  const streams = [child.stdout!, child.stderr!].map(stream => new Promise<void>(resolve => {
     let pending = "";
     const write = (line: string) => { for (const secret of secrets) line = line.split(secret).join("[redacted]"); console.log(line); };
     stream.on("data", chunk => { pending += chunk.toString(); const lines = pending.split(/\r?\n/); pending = lines.pop()!; for (const line of lines) write(line); });
-    stream.on("end", () => { if (pending) write(pending); });
-  }
-  child.on("error", () => { console.error("Could not start preparation."); process.exitCode = 1; });
-  child.on("close", code => { console.log(code === 0 ? "Preparation finished. Refresh health to check coverage." : "Preparation failed. Review the log, then refresh health."); process.exitCode = code ?? 1; });
+    stream.on("end", () => { if (pending) write(pending); resolve(); });
+  }));
+  const code = await new Promise<number>((resolve, reject) => {
+    child.on("error", reject);
+    child.on("close", value => resolve(value ?? 1));
+  });
+  await Promise.all(streams);
+  if (code !== 0) throw new Error(`Playlist command failed with exit code ${code}.`);
+}
+
+async function prepare() {
+  console.log(`Preparing ${days} days in ${target}. ${target === "r2" ? "Live R2 catalog and clips will be updated." : "Local catalog and clips only."}`);
+  await runPlaylist(["prepare", String(days)]);
+  console.log("Preparation finished. Refresh health to check coverage.");
+}
+
+async function reclip() {
+  const songId = Number(process.argv[5]);
+  const previewStart = Number(process.argv[6]);
+  if (!Number.isInteger(songId) || songId < 1) throw new Error("Select a valid song.");
+  if (!Number.isFinite(previewStart) || previewStart < 0 || previewStart > 3600) throw new Error("Start must be between 0 and 3600 seconds.");
+  console.log(`Building replacement clip for song ${songId} from ${previewStart} seconds in ${target}...`);
+  await runPlaylist(["reclip", String(songId), String(previewStart)]);
+  console.log("Replacement clip is ready. Refresh the dashboard to confirm it.");
 }
 
 if (command === "snapshot") await snapshot();
 else if (command === "prepare") await prepare();
-else throw new Error("Usage: admin.ts snapshot|prepare local|r2 [1-30 days]");
+else if (command === "reclip") await reclip();
+else throw new Error("Usage: admin.ts snapshot|prepare|reclip local|r2 [1-30 days] [song id] [start seconds]");

@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile, open, unlink, mkdtemp, rm, access } from "n
 import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
-import { dataDir, readCatalog, writeCatalog } from "../lib/catalog";
+import { dataDir, readCatalog, writeCatalog, type CatalogSong } from "../lib/catalog";
 import { categoryFrom, CATEGORIES } from "../lib/categories";
 import { playlistUrl, parseTrackTitle, dateOffset, automaticStartFromSegments, automaticStartFromSilenceLog } from "../lib/playlist";
 import { getCurrentChallengeDate, stableIndex } from "../lib/challenge";
@@ -84,6 +84,32 @@ async function detectAutomaticStart(source: string, sourceUrl: string, infoPath:
     return { start: 0, method: "none" };
   }
 }
+async function buildClip(song: CatalogSong, requestedStart: number, detectStart: boolean) {
+  if (!song.sourceUrl || !/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.test(song.sourceUrl)) throw new Error("Invalid video URL");
+  if (!Number.isFinite(requestedStart) || requestedStart < 0 || requestedStart > 3600) throw new Error("Invalid preview start");
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "balkanguess-"));
+  try {
+    const source = path.join(tempDir, "source.webm");
+    await run(ytdlp, ["--ignore-config", "--no-playlist", "--js-runtimes", "node", "--socket-timeout", "20", "--retries", "1", "--write-info-json", "-f", "bestaudio", "-o", source, song.sourceUrl]);
+    let previewStart = requestedStart;
+    if (detectStart && previewStart === 0) {
+      const automatic = await detectAutomaticStart(source, song.sourceUrl, path.join(tempDir, "source.info.json"));
+      if (automatic.start) {
+        previewStart = automatic.start;
+        console.log(`Automatic start for song ${song.id}: ${automatic.start}s (${automatic.method})`);
+      }
+    }
+    const clip = path.join(tempDir, "clip.mp3");
+    await run(ffmpeg, ["-hide_banner", "-y", "-i", source, "-ss", String(previewStart), "-t", "16", "-vn", "-map_metadata", "-1", "-codec:a", "libmp3lame", "-b:a", "128k", clip]);
+    const probe = process.env.FFPROBE_PATH || (path.dirname(ffmpeg) === "." ? "ffprobe" : path.join(path.dirname(ffmpeg), process.platform === "win32" ? "ffprobe.exe" : "ffprobe"));
+    const duration = Number((await run(probe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", clip])).trim());
+    if (duration < 15.9 || duration > 16.2) throw new Error(`Invalid clip duration: ${duration}`);
+    const key = `${randomUUID()}.mp3`;
+    try { await storeClip(key, await readFile(clip)); }
+    catch (error) { await invalidateClip(key).catch(() => undefined); throw error; }
+    return { key, previewStart };
+  } finally { await cleanTemporaryDirectory(tempDir); }
+}
 async function main() {
   await mkdir(path.join(root, "clips"), { recursive: true });
   const lockPath = path.join(root, "worker.lock");
@@ -135,6 +161,28 @@ async function main() {
       song.clipKey = null;
       await writeCatalog(catalog);
       console.log(`Song ${song.id} (${song.artist} - ${song.title}) will start at ${previewStart} seconds. Run prepare to rebuild its clip if it is assigned.`);
+    } else if (command === "reclip") {
+      const songId = Number(process.argv[3]);
+      const previewStart = Number(process.argv[4]);
+      if (!Number.isInteger(songId) || songId < 1) throw new Error("Song ID must be a positive integer.");
+      if (!Number.isFinite(previewStart) || previewStart < 0 || previewStart > 3600) throw new Error("Start must be between 0 and 3600 seconds.");
+      const song = catalog.songs.find(candidate => candidate.id === songId);
+      if (!song) throw new Error(`Song ${songId} was not found.`);
+      const previousKey = song.clipKey;
+      const previousStart = song.previewStart;
+      const replacement = await buildClip(song, previewStart, false);
+      song.previewStart = replacement.previewStart;
+      song.clipKey = replacement.key;
+      try { await writeCatalog(catalog); }
+      catch (error) {
+        song.previewStart = previousStart;
+        song.clipKey = previousKey;
+        await writeCatalog(catalog).catch(() => undefined);
+        await invalidateClip(replacement.key).catch(() => undefined);
+        throw error;
+      }
+      if (previousKey && previousKey !== replacement.key) await invalidateClip(previousKey);
+      console.log(`Rebuilt song ${song.id} (${song.artist} - ${song.title}) from ${previewStart} seconds.`);
     } else if (command === "prepare") {
       const days = Number(process.argv[3] || 7);
       if (!Number.isInteger(days) || days < 1 || days > 30) throw new Error("Days must be between 1 and 30.");
@@ -157,31 +205,14 @@ async function main() {
           let prepared = false;
           for (let attempt = 0; attempt < Math.min(pool.length, 5); attempt++) {
             const song = pool[(start + attempt) % pool.length];
-            const tempDir = await mkdtemp(path.join(os.tmpdir(), "balkanguess-"));
             try {
               if (song.clipKey) {
                 if (!await clipExists(song.clipKey)) song.clipKey = null;
               }
               if (!song.clipKey) {
-                if (!song.sourceUrl || !/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.test(song.sourceUrl)) throw new Error("Invalid video URL");
-                if (!Number.isFinite(song.previewStart) || song.previewStart < 0) throw new Error("Invalid preview start");
-                const source = path.join(tempDir, "source.webm");
-                await run(ytdlp, ["--ignore-config", "--no-playlist", "--js-runtimes", "node", "--socket-timeout", "20", "--retries", "1", "--write-info-json", "-f", "bestaudio", "-o", source, song.sourceUrl]);
-                if (song.previewStart === 0) {
-                  const automatic = await detectAutomaticStart(source, song.sourceUrl, path.join(tempDir, "source.info.json"));
-                  if (automatic.start) {
-                    song.previewStart = automatic.start;
-                    console.log(`Automatic start for song ${song.id}: ${automatic.start}s (${automatic.method})`);
-                  }
-                }
-                const clip = path.join(tempDir, "clip.mp3");
-                await run(ffmpeg, ["-hide_banner", "-y", "-i", source, "-ss", String(song.previewStart), "-t", "16", "-vn", "-map_metadata", "-1", "-codec:a", "libmp3lame", "-b:a", "128k", clip]);
-                const probe = process.env.FFPROBE_PATH || (path.dirname(ffmpeg) === "." ? "ffprobe" : path.join(path.dirname(ffmpeg), process.platform === "win32" ? "ffprobe.exe" : "ffprobe"));
-                const duration = Number((await run(probe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", clip])).trim());
-                if (duration < 15.9 || duration > 16.2) throw new Error(`Invalid clip duration: ${duration}`);
-                const key = `${randomUUID()}.mp3`;
-                await storeClip(key, await readFile(clip));
-                song.clipKey = key;
+                const built = await buildClip(song, song.previewStart, true);
+                song.previewStart = built.previewStart;
+                song.clipKey = built.key;
               }
               catalog.days[dayKey] = song.id;
               await writeCatalog(catalog);
@@ -192,7 +223,6 @@ async function main() {
               if (youtubeBlocked(error)) throw new Error("YouTube blocked this runner's IP address. Use the configured self-hosted home runner.", { cause: error });
               console.error(`Preparation failed for song ${song.id}:`, error instanceof Error ? error.message : error);
             }
-            finally { await cleanTemporaryDirectory(tempDir); }
           }
           if (!prepared) failures++;
         }
@@ -226,7 +256,7 @@ async function main() {
       } finally {
         await prisma.$disconnect();
       }
-    } else throw new Error("Usage: playlist.ts import CATEGORY URL | find QUERY | start SONG_ID SECONDS | prepare [DAYS] | publish");
+    } else throw new Error("Usage: playlist.ts import CATEGORY URL | find QUERY | start SONG_ID SECONDS | reclip SONG_ID SECONDS | prepare [DAYS] | publish");
   } finally { await lock.close(); await unlink(lockPath); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

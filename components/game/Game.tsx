@@ -244,22 +244,21 @@ function CategoryGame({ category }: { category: Category }) {
     const controller = new AbortController();
     const completedResult = game.completed && Boolean(game.answer) && Boolean(game.proof);
     setStatsLoading(true);
-    const reportedKey = `balkanguess:stats:v1:${category}:${date}`;
-    const reported = localStorage.getItem(reportedKey) === "1";
-    const shouldReport = completedResult && !reported;
-    fetch(shouldReport ? "/api/daily/stats" : `/api/daily/stats?category=${category}&date=${date}`, {
-      method: shouldReport ? "POST" : "GET",
-      headers: shouldReport ? { "Content-Type": "application/json" } : undefined,
-      body: shouldReport ? JSON.stringify({ proof: game.proof }) : undefined,
+    fetch(completedResult ? "/api/daily/stats" : `/api/daily/stats?category=${category}&date=${date}`, {
+      method: completedResult ? "POST" : "GET",
+      headers: completedResult ? { "Content-Type": "application/json" } : undefined,
+      body: completedResult ? JSON.stringify({ proof: game.proof }) : undefined,
       signal: controller.signal,
-    }).then(response => {
-      if (!response.ok) throw new Error("Could not load stats.");
-      return response.json() as Promise<DailyStats>;
+    }).then(async response => {
+      const value = await response.json() as DailyStats & { error?: string };
+      if (!response.ok) throw new Error(value.error || "Could not load stats.");
+      return value;
     }).then(value => {
-      if (shouldReport) localStorage.setItem(reportedKey, "1");
       setStats(value);
     }).catch(error => {
-      if (!(error instanceof DOMException && error.name === "AbortError")) setStats(undefined);
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setStats(undefined);
+      if (completedResult) setError("Your result is saved on this device, but community stats could not update. Reload to retry.");
     }).finally(() => {
       if (controller.signal.aborted) return;
       setStatsLoading(false);

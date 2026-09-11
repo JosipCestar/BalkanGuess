@@ -19,6 +19,7 @@ function audioHeaders(length: number, cacheControl = "private, no-store") {
   return new Headers({
     "Accept-Ranges": "bytes",
     "Cache-Control": cacheControl,
+    "CDN-Cache-Control": "no-store",
     "Content-Length": String(length),
     "Content-Type": "audio/mpeg",
   });
@@ -52,7 +53,7 @@ async function workerClip(clipKey: string, rangeHeader: string | null) {
     if (!range) return new Response(null, { status: 416, headers: { "Accept-Ranges": "bytes", "Content-Range": `bytes */${metadata.size}` } });
     const object = await env.AUDIO_BUCKET.get(key, { range: { offset: range.start, length: range.end - range.start + 1 } });
     if (!object) return new Response(null, { status: 404 });
-    const headers = audioHeaders(range.end - range.start + 1, "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800");
+    const headers = audioHeaders(range.end - range.start + 1, "private, max-age=3600");
     headers.set("Content-Range", `bytes ${range.start}-${range.end}/${metadata.size}`);
     headers.set("ETag", object.httpEtag);
     headers.set("Last-Modified", object.uploaded.toUTCString());
@@ -60,7 +61,7 @@ async function workerClip(clipKey: string, rangeHeader: string | null) {
   }
   const object = await env.AUDIO_BUCKET.get(key);
   if (!object) return new Response(null, { status: 404 });
-  const headers = audioHeaders(object.size, "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800");
+  const headers = audioHeaders(object.size, "private, max-age=3600");
   headers.set("ETag", object.httpEtag);
   headers.set("Last-Modified", object.uploaded.toUTCString());
   return new Response(object.body, { headers });

@@ -59,21 +59,7 @@ jobs:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
 
       - name: Refresh playlist catalog
-        run: |
-          npm run playlist -- import club-mix 'https://www.youtube.com/playlist?list=PLJ14wpRv6ztY'
-          npm run playlist -- import jala-buba 'https://www.youtube.com/playlist?list=PLVQZG1Rymm4U'
-          npm run playlist -- import exyu 'https://www.youtube.com/playlist?list=PLEENVhYLmeNM'
-        env:
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
-
-      - name: Import Trap playlist
-        id: trap-import
-        continue-on-error: true
-        run: |
-          npm run playlist -- import trap 'https://music.youtube.com/playlist?list=PLX9fzSi3XuA4'
+        run: npm run playlist -- import-all
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

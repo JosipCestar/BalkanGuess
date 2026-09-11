@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { categoryFrom } from "../lib/categories";
-import { playlistUrl, parseTrackTitle, dateOffset, automaticStartFromSegments, automaticStartFromSilenceLog } from "../lib/playlist";
+import { playlistUrl, parsePlaylistEntry, parseTrackTitle, dateOffset, automaticStartFromSegments, automaticStartFromSilenceLog } from "../lib/playlist";
+import { PLAYLIST_SOURCES } from "../lib/playlist-sources";
+import { CATEGORIES } from "../lib/categories";
 describe("playlist import", () => {
   it("preserves collaborations and cleans video labels", () => {
     expect(parseTrackTitle("Jala Brat & Buba Corelli & Baby it's Pablo - Padam (Official Music Video)")).toEqual({ artist: "Jala Brat & Buba Corelli & Baby it's Pablo", title: "Padam" });
@@ -9,8 +11,19 @@ describe("playlist import", () => {
   it("only accepts YouTube playlist URLs", () => {
     expect(playlistUrl("https://www.youtube.com/playlist?list=PLVQZG1Rymm4U&extra=1")).toBe("https://www.youtube.com/playlist?list=PLVQZG1Rymm4U");
     expect(playlistUrl("https://music.youtube.com/playlist?list=PLX9fzSi3XuA4")).toBe("https://www.youtube.com/playlist?list=PLX9fzSi3XuA4");
+    expect(playlistUrl("https://www.youtube.com/watch?v=2kvZgvR6ctk&list=PLX9fzSi3XuA4")).toBe("https://www.youtube.com/watch?v=2kvZgvR6ctk&list=PLX9fzSi3XuA4");
+    expect(() => playlistUrl("https://www.youtube.com/watch?list=PLX9fzSi3XuA4")).toThrow();
     expect(() => playlistUrl("https://evil.example/playlist?list=abc")).toThrow();
     expect(() => playlistUrl("file:///etc/passwd")).toThrow();
+  });
+  it("uses YouTube Music metadata when the title has no artist separator", () => {
+    expect(parsePlaylistEntry({ title: "Honey (feat. Žugi)", channel: "BUNTAI" })).toEqual({ artist: "BUNTAI", title: "Honey (feat. Žugi)" });
+    expect(parsePlaylistEntry({ title: "Track", uploader: "Artist - Topic" })).toEqual({ artist: "Artist", title: "Track" });
+    expect(parsePlaylistEntry({ title: "[Deleted video]", channel: "YouTube" })).toBeNull();
+  });
+  it("has one configured playlist for every category", () => {
+    expect(PLAYLIST_SOURCES.map(source => source.category).sort()).toEqual(CATEGORIES.map(category => category.id).sort());
+    for (const source of PLAYLIST_SOURCES) expect(() => playlistUrl(source.url)).not.toThrow();
   });
   it("validates category boundaries", () => {
     expect(categoryFrom("club-mix")).toBe("club-mix");

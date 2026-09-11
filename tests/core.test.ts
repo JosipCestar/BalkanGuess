@@ -101,11 +101,12 @@ describe("catalog validation and readiness", () => {
     expect(missingCatalogCoverage(catalog, "2026-09-11", 1)).toEqual([]);
     expect(missingCatalogCoverage(catalog, "2026-09-11", 2)).toHaveLength(4);
   });
-  it("does not mark a category live until its first song is imported", () => {
+  it("requires coverage for every production category", () => {
     const onlyClubMix = validateCatalog({ songs: [{ ...song, categories: ["club-mix"] }], days: { "2026-09-11:club-mix": 1 } });
     expect(missingCatalogCoverage(onlyClubMix, "2026-09-11", 1)).toEqual([
       "2026-09-11:jala-buba",
       "2026-09-11:exyu",
+      "2026-09-11:trap",
     ]);
   });
 });

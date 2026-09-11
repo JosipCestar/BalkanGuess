@@ -13,9 +13,13 @@ do not know the answer.
 
 ## Daily categories
 
-The game includes a main Balkan Club Mix challenge plus focused Jala i Buba and
-EXYU categories. Every category has its own daily song and saved progress, so
-players can enjoy each challenge independently.
+The game includes a main Balkan Club Mix challenge plus focused Jala i Buba,
+EXYU, and Trap categories. Every category has its own daily song and saved
+progress, so players can enjoy each challenge independently.
+
+Playlist sources are centralized in `lib/playlist-sources.ts`. Update that file
+when a category moves to a new YouTube playlist; the daily workflow imports every
+configured source before preparing the next seven challenges.
 
 ## Results and privacy
 

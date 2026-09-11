@@ -7,7 +7,8 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { dataDir, readCatalog, writeCatalog, type CatalogSong } from "../lib/catalog";
 import { categoryFrom, CATEGORIES } from "../lib/categories";
-import { playlistUrl, parseTrackTitle, dateOffset, automaticStartFromSegments, automaticStartFromSilenceLog } from "../lib/playlist";
+import { playlistUrl, parsePlaylistEntry, dateOffset, automaticStartFromSegments, automaticStartFromSilenceLog } from "../lib/playlist";
+import { PLAYLIST_SOURCES } from "../lib/playlist-sources";
 import { getCurrentChallengeDate, stableIndex } from "../lib/challenge";
 import { normalizeBalkanText } from "../lib/text";
 import { deleteR2Object, putR2Object, r2ObjectExists, remoteCatalogEnabled } from "../lib/r2";
@@ -110,6 +111,36 @@ async function buildClip(song: CatalogSong, requestedStart: number, detectStart:
     return { key, previewStart };
   } finally { await cleanTemporaryDirectory(tempDir); }
 }
+async function importPlaylist(catalog: Awaited<ReturnType<typeof readCatalog>>, category: ReturnType<typeof categoryFrom>, value: string) {
+  const url = playlistUrl(value);
+  const result = JSON.parse(await run(ytdlp, ["--ignore-config", "--flat-playlist", "--dump-single-json", "--skip-download", "--socket-timeout", "20", url]));
+  let imported = 0, skipped = 0;
+  let changed = false;
+  const review: Array<{ title: string; id: string }> = [];
+  for (const entry of result.entries || []) {
+    const parsed = parsePlaylistEntry(entry);
+    if (!parsed || !/^[\w-]{11}$/.test(entry.id || "") || ["private", "needs_auth", "premium_only", "subscriber_only"].includes(entry.availability)) {
+      skipped++;
+      review.push({ title: entry.title, id: entry.id });
+      continue;
+    }
+    const sourceUrl = `https://www.youtube.com/watch?v=${entry.id}`;
+    const existing = catalog.songs.find(song => song.sourceUrl === sourceUrl);
+    if (existing) {
+      if (!existing.categories.includes(category)) {
+        existing.categories.push(category);
+        changed = true;
+      }
+      continue;
+    }
+    catalog.songs.push({ id: Math.max(0, ...catalog.songs.map(song => song.id)) + 1, ...parsed, sourceUrl, categories: [category], clipKey: null, previewStart: 0, soundcloudTrackId: null, soundcloudUrl: null, active: true });
+    imported++;
+    changed = true;
+  }
+  if (changed) await writeCatalog(catalog);
+  await writeFile(path.join(root, `review-${category}.json`), JSON.stringify(review, null, 2));
+  console.log(`Imported ${imported} songs into ${category}; skipped ${skipped} entries needing review.${changed ? " Catalog updated." : " Catalog unchanged."}`);
+}
 async function main() {
   await mkdir(path.join(root, "clips"), { recursive: true });
   const lockPath = path.join(root, "worker.lock");
@@ -119,30 +150,17 @@ async function main() {
     const command = process.argv[2];
     if (command === "import") {
       const category = categoryFrom(process.argv[3]);
-      const url = playlistUrl(process.argv[4] || "");
-      const result = JSON.parse(await run(ytdlp, ["--ignore-config", "--flat-playlist", "--dump-single-json", "--skip-download", "--socket-timeout", "20", url]));
-      let imported = 0, skipped = 0;
-      let changed = false;
-      const review: Array<{ title: string; id: string }> = [];
-      for (const entry of result.entries || []) {
-        const parsed = parseTrackTitle(entry.title || "");
-        if (!parsed || !/^[\w-]{11}$/.test(entry.id || "") || ["private", "needs_auth", "premium_only", "subscriber_only"].includes(entry.availability)) { skipped++; review.push({ title: entry.title, id: entry.id }); continue; }
-        const sourceUrl = `https://www.youtube.com/watch?v=${entry.id}`;
-        const existing = catalog.songs.find(song => song.sourceUrl === sourceUrl);
-        if (existing) {
-          if (!existing.categories.includes(category)) {
-            existing.categories.push(category);
-            changed = true;
-          }
-          continue;
+      await importPlaylist(catalog, category, process.argv[4] || "");
+    } else if (command === "import-all") {
+      for (const source of PLAYLIST_SOURCES) {
+        try {
+          await importPlaylist(catalog, source.category, source.url);
+        } catch (error) {
+          const required = CATEGORIES.find(category => category.id === source.category)?.required;
+          if (required) throw error;
+          console.warn(`Optional ${source.category} import failed:`, error instanceof Error ? error.message : error);
         }
-        catalog.songs.push({ id: Math.max(0, ...catalog.songs.map(song => song.id)) + 1, ...parsed, sourceUrl, categories: [category], clipKey: null, previewStart: 0, soundcloudTrackId: null, soundcloudUrl: null, active: true });
-        imported++;
-        changed = true;
       }
-      if (changed) await writeCatalog(catalog);
-      await writeFile(path.join(root, `review-${category}.json`), JSON.stringify(review, null, 2));
-      console.log(`Imported ${imported} songs into ${category}; skipped ${skipped} entries needing review.${changed ? " Catalog updated." : " Catalog unchanged."}`);
     } else if (command === "find") {
       const query = normalizeBalkanText(process.argv.slice(3).join(" "));
       if (!query) throw new Error("Enter an artist or song title to find.");
@@ -256,7 +274,7 @@ async function main() {
       } finally {
         await prisma.$disconnect();
       }
-    } else throw new Error("Usage: playlist.ts import CATEGORY URL | find QUERY | start SONG_ID SECONDS | reclip SONG_ID SECONDS | prepare [DAYS] | publish");
+    } else throw new Error("Usage: playlist.ts import CATEGORY URL | import-all | find QUERY | start SONG_ID SECONDS | reclip SONG_ID SECONDS | prepare [DAYS] | publish");
   } finally { await lock.close(); await unlink(lockPath); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

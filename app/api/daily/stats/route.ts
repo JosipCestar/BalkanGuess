@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentChallengeDate } from "@/lib/challenge";
 import { summarizeDailyResults } from "@/lib/daily-stats";
-import { withPrisma } from "@/lib/prisma-client";
+import { withPrisma } from "@/lib/prisma-worker-client";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { proofMatches, verifyGameProof } from "@/lib/game-proof";
 import { HttpProblem, readJsonBody } from "@/lib/http";

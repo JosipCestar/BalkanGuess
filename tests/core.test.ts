@@ -6,9 +6,11 @@ import { getSnippetEnd, hasReachedSnippetEnd, withActualPlaybackStart } from "..
 import { haveMatchingArtistCredit, parseArtistCredits } from "../lib/artist";
 import { isValidCompletedResult, summarizeDailyResults } from "../lib/daily-stats";
 import { dailySongFromCatalog } from "../lib/daily";
-import { signGameProof, verifyGameProof, type GameProof } from "../lib/game-proof";
+import { canAdvanceProof, canRevealProof, signGameProof, verifyGameProof, type GameProof } from "../lib/game-proof";
 import { readJsonBody } from "../lib/http";
 import { signPlayerId, verifyPlayerCookie } from "../lib/player";
+import { validateCatalog } from "../lib/catalog";
+import { missingCatalogCoverage } from "../lib/readiness";
 describe("Balkan text normalization", () => { it("normalizes diacritics and punctuation", () => { expect(normalizeBalkanText(" Željko Joksimović ")).toBe("zeljko joksimovic"); expect(normalizeBalkanText("Đurđevdan")).toBe("djurdjevdan"); }); });
 describe("artist credit matching", () => {
   it("parses the collaboration styles used by the song catalog", () => {
@@ -37,6 +39,12 @@ describe("signed game proof", () => {
     const token = signGameProof(proof, secret);
     expect(verifyGameProof(token, secret)).toEqual(proof);
     expect(verifyGameProof(`${token.slice(0, -1)}x`, secret)).toBeNull();
+  });
+  it("only advances the exact signed attempt and reveals completed proofs", () => {
+    expect(canAdvanceProof(proof, 3)).toBe(true);
+    expect(canAdvanceProof(proof, 4)).toBe(false);
+    expect(canRevealProof(proof, 3)).toBe(false);
+    expect(canRevealProof({ ...proof, attempt: 6, completed: true }, 6)).toBe(true);
   });
 });
 describe("signed anonymous player cookie", () => {
@@ -79,5 +87,17 @@ describe("snippet boundaries", () => {
     const active = withActualPlaybackStart({ url: "stream", start: 30, duration: 1 }, 0);
     expect(getSnippetEnd(active.start, active.duration)).toBe(1);
     expect(hasReachedSnippetEnd(1, active.start, active.duration)).toBe(true);
+  });
+});
+describe("catalog validation and readiness", () => {
+  const song = { id: 1, title: "Song", artist: "Artist", categories: ["club-mix", "jala-buba", "exyu"], sourceUrl: null, clipKey: "clip.mp3", previewStart: 0, soundcloudTrackId: null, soundcloudUrl: null, active: true };
+  it("rejects invalid clip keys and dangling assignments", () => {
+    expect(() => validateCatalog({ songs: [{ ...song, clipKey: "../clip.mp3" }], days: {} })).toThrow();
+    expect(() => validateCatalog({ songs: [song], days: { "2026-09-11:club-mix": 2 } })).toThrow();
+  });
+  it("reports missing category coverage", () => {
+    const catalog = validateCatalog({ songs: [song], days: { "2026-09-11:club-mix": 1, "2026-09-11:jala-buba": 1, "2026-09-11:exyu": 1 } });
+    expect(missingCatalogCoverage(catalog, "2026-09-11", 1)).toEqual([]);
+    expect(missingCatalogCoverage(catalog, "2026-09-11", 2)).toHaveLength(3);
   });
 });

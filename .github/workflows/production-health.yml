@@ -1,0 +1,17 @@
+name: Monitor production readiness
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require production readiness
+        run: curl --fail-with-body --silent --show-error --max-time 15 https://balkan-guess.balkan-guess.workers.dev/api/readiness

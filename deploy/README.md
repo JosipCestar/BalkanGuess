@@ -92,11 +92,19 @@ Before deploying this version over an existing installation, run the **Prepare d
 
 Before replacing an existing public URL, verify:
 
-- `/api/health` returns `{ "status": "ok" }`.
+- `/api/health` returns `{ "status": "ok" }`, and `/api/readiness` returns HTTP 200 with all checks true.
 - `/api/daily?category=club-mix`, `jala-buba`, and `exyu` each report a prepared challenge.
 - Each category plays audio, accepts a guess, reveals the answer, and restores browser progress after reload.
 - `/api/daily/clip` serves only today's assigned private clip and supports browser range requests.
 - A second manual daily workflow run succeeds without replacing prepared assignments or rewriting an unchanged catalog.
+
+Run the read-only automated checks after each deployment:
+
+```powershell
+npm run smoke:production -- https://your-worker.example
+```
+
+The `Monitor production readiness` workflow also checks `/api/readiness` every 30 minutes. Keep GitHub Actions failure notifications enabled so database, catalog, or three-day coverage failures are actionable.
 
 ## Maintenance
 

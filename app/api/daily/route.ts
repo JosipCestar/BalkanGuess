@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { challengeNumber, getCurrentChallengeDate } from "@/lib/challenge";
-import { categoryFrom, CATEGORIES } from "@/lib/categories";
+import { categoryOrNull, CATEGORIES } from "@/lib/categories";
 import { getDailySong } from "@/lib/daily";
 import { localMode } from "@/lib/runtime";
 import { getOrCreatePlayer, setPlayerCookie } from "@/lib/player";
@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
   try {
     const limited = await enforceRateLimit(request, "SESSION_RATE_LIMITER", "ip");
     if (limited) return limited;
-    const category = categoryFrom(request.nextUrl.searchParams.get("category"));
+    const category = categoryOrNull(request.nextUrl.searchParams.get("category"));
+    if (!category) return NextResponse.json({ error: "Unknown category." }, { status: 400 });
     const date = getCurrentChallengeDate();
     const song = await getDailySong(date, category);
     const { playerId, isNew } = getOrCreatePlayer(request);

@@ -69,3 +69,11 @@ export function proofMatches(proof: GameProof | null, expected: { playerId: stri
     && proof.date === expected.date
     && proof.category === expected.category;
 }
+
+export function canAdvanceProof(proof: GameProof, attempt: unknown) {
+  return !proof.completed && Number.isInteger(attempt) && attempt === proof.attempt && Number(attempt) >= 0 && Number(attempt) <= 5;
+}
+
+export function canRevealProof(proof: GameProof, attempt: unknown) {
+  return proof.completed && Number.isInteger(attempt) && attempt === proof.attempt;
+}

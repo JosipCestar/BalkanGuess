@@ -4,8 +4,12 @@ export const CATEGORIES = [
   { id: "exyu", label: "EXYU" },
 ] as const;
 export type Category = typeof CATEGORIES[number]["id"];
-export function categoryFrom(value: unknown): Category {
+export function categoryOrNull(value: unknown): Category | null {
   if (value == null) return "club-mix";
-  if (!CATEGORIES.some(category => category.id === value)) throw new Error("Unknown category.");
-  return value as Category;
+  return CATEGORIES.some(category => category.id === value) ? value as Category : null;
+}
+export function categoryFrom(value: unknown): Category {
+  const category = categoryOrNull(value);
+  if (!category) throw new Error("Unknown category.");
+  return category;
 }

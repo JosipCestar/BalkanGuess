@@ -1,9 +1,5 @@
 # BalkanGuess
 
-The separate Windows admin app is launched with `npm run admin` or
-`admin/Start Admin.cmd`. See [admin setup](admin/README.md) for community
-statistics, catalog health checks, and song preparation.
-
 BalkanGuess is a daily music-guessing game for fans of Balkan music. Each day
 offers a new song in every category and challenges players to identify it from
 an increasingly longer audio clip.

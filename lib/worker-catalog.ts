@@ -1,4 +1,4 @@
-import type { Catalog } from "./catalog";
+import { validateCatalog, type Catalog } from "./catalog";
 
 const CATALOG_CACHE_MS = 60_000;
 let cachedCatalog: { value: Catalog; expiresAt: number } | undefined;
@@ -12,7 +12,7 @@ export async function readWorkerCatalog(): Promise<Catalog> {
       const { env } = await import("cloudflare:workers");
       const object = await env.AUDIO_BUCKET.get("state/catalog.json");
       if (!object) throw new Error("The R2 playlist catalog has not been published.");
-      const value = await object.json<Catalog>();
+      const value = validateCatalog(await object.json<unknown>());
       cachedCatalog = { value, expiresAt: Date.now() + CATALOG_CACHE_MS };
       return value;
     })();

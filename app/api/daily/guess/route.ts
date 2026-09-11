@@ -3,7 +3,7 @@ import { dailySongFromCatalog, readRuntimeCatalog } from "@/lib/daily";
 import { getCurrentChallengeDate } from "@/lib/challenge";
 import { haveMatchingArtistCredit } from "@/lib/artist";
 import { categoryFrom } from "@/lib/categories";
-import { proofMatches, signGameProof, verifyGameProof } from "@/lib/game-proof";
+import { canAdvanceProof, proofMatches, signGameProof, verifyGameProof } from "@/lib/game-proof";
 import { HttpProblem, readJsonBody } from "@/lib/http";
 import { requestPlayerId } from "@/lib/player";
 import { enforceActorAndIpRateLimits } from "@/lib/rate-limit";
@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
     const category = categoryFrom(body.category);
     const playerId = requestPlayerId(request);
     const previousProof = verifyGameProof(body.proof);
-    if (!playerId || !proofMatches(previousProof, { playerId, date: body.date, category }) || previousProof.completed
-      || Number(body.attempt) < previousProof.attempt || Number(body.attempt) > 5) {
+    if (!playerId || !proofMatches(previousProof, { playerId, date: body.date, category })
+      || !canAdvanceProof(previousProof, body.attempt)) {
       return NextResponse.json({ error: "Invalid or expired game proof. Reload the challenge." }, { status: 409 });
     }
     const catalog = await readRuntimeCatalog();

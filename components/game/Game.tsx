@@ -12,6 +12,7 @@ type Song = { id: number; artist: string; title: string };
 type Answer = { artist: string; title: string; sourceUrl?: string | null; soundcloudUrl?: string | null };
 type DailyResponse = { error?: string; ready: boolean; development: boolean; date: string; challengeNumber: number; proof: string; audioUrl?: string | null };
 type GuessResponse = { error?: string; correct: boolean; artistMatch: boolean; answer?: Answer; proof: string };
+type SkipResponse = { error?: string; proof?: string };
 type Entry = { type: "wrong" | "skip" | "artist" | "correct"; song?: Song };
 type Saved = {
   attempt: number;
@@ -243,22 +244,25 @@ function CategoryGame({ category }: { category: Category }) {
     if (!date || game.attempt === 0) return;
     const controller = new AbortController();
     const completedResult = game.completed && Boolean(game.answer) && Boolean(game.proof);
+    const reportKey = `balkanguess:reported:v1:${category}:${date}`;
+    const shouldSubmit = completedResult && localStorage.getItem(reportKey) !== game.proof;
     setStatsLoading(true);
-    fetch(completedResult ? "/api/daily/stats" : `/api/daily/stats?category=${category}&date=${date}`, {
-      method: completedResult ? "POST" : "GET",
-      headers: completedResult ? { "Content-Type": "application/json" } : undefined,
-      body: completedResult ? JSON.stringify({ proof: game.proof }) : undefined,
+    fetch(shouldSubmit ? "/api/daily/stats" : `/api/daily/stats?category=${category}&date=${date}`, {
+      method: shouldSubmit ? "POST" : "GET",
+      headers: shouldSubmit ? { "Content-Type": "application/json" } : undefined,
+      body: shouldSubmit ? JSON.stringify({ proof: game.proof }) : undefined,
       signal: controller.signal,
     }).then(async response => {
       const value = await response.json() as DailyStats & { error?: string };
       if (!response.ok) throw new Error(value.error || "Could not load stats.");
       return value;
     }).then(value => {
+      if (shouldSubmit && game.proof) localStorage.setItem(reportKey, game.proof);
       setStats(value);
     }).catch(error => {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setStats(undefined);
-      if (completedResult) setError("Your result is saved on this device, but community stats could not update. Reload to retry.");
+      if (shouldSubmit) setError("Your result is saved on this device, but community stats could not update. Reload to retry.");
     }).finally(() => {
       if (controller.signal.aborted) return;
       setStatsLoading(false);
@@ -334,7 +338,30 @@ function CategoryGame({ category }: { category: Category }) {
     }
   };
 
-  const skip = () => { if (ready && !game.completed && !guessPendingRef.current) consume({ type: "skip" }); };
+  const skip = async () => {
+    if (!ready || !date || game.completed || guessPendingRef.current) return;
+    guessPendingRef.current = true;
+    setGuessPending(true);
+    setError("");
+    try {
+      const response = await fetch("/api/daily/skip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date, category, attempt: game.attempt, proof: game.proof }),
+      });
+      const data = await response.json() as SkipResponse;
+      if (!response.ok || !data.proof) {
+        if (response.status === 409) setGame({ ...empty, proof: initialProof });
+        throw new Error(data.error || "Could not skip attempt.");
+      }
+      consume({ type: "skip" }, undefined, data.proof);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not skip attempt.");
+    } finally {
+      guessPendingRef.current = false;
+      setGuessPending(false);
+    }
+  };
 
   const share = async () => {
     const cells = Array.from({ length: 6 }, (_, index) => {
@@ -426,7 +453,7 @@ function CategoryGame({ category }: { category: Category }) {
             </li>)}
           </ul>}
           <div className="actions">
-            <button className="secondary" disabled={guessPending} onClick={skip}>SKIP</button>
+            <button className="secondary" disabled={guessPending} onClick={() => void skip()}>SKIP</button>
             <button className="secondary" disabled={!selected || guessPending} onClick={() => void guess()}>{guessPending ? "SUBMITTING…" : "SUBMIT GUESS"}</button>
           </div>
         </div>}

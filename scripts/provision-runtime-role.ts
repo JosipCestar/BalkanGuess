@@ -24,8 +24,8 @@ function runtimeConnectionUrl(adminConnectionUrl: string, password: string) {
 }
 
 async function formattedSql(client: Client, template: string, ...values: string[]) {
-  const placeholders = values.map((_, index) => `$${index + 2}`).join(", ");
-  const result = await client.query<{ sql: string }>(`SELECT format($1, ${placeholders}) AS sql`, [template, ...values]);
+  const placeholders = values.map((_, index) => `$${index + 2}::text`).join(", ");
+  const result = await client.query<{ sql: string }>(`SELECT format($1::text, ${placeholders}) AS sql`, [template, ...values]);
   return result.rows[0].sql;
 }
 

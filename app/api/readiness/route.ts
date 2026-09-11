@@ -3,6 +3,8 @@ import { readRuntimeCatalog } from "@/lib/daily";
 import { withPrisma } from "@/lib/prisma-worker-client";
 import { missingCatalogCoverage, REQUIRED_COVERAGE_DAYS } from "@/lib/readiness";
 import { NextResponse } from "next/server";
+import { readDailyStatistics } from "@/lib/daily-stats-db";
+import { CATEGORIES } from "@/lib/categories";
 
 const CACHE_MS = 30_000;
 type Check = { status: "ok" | "not_ready"; catalog: boolean; database: boolean; coverage: boolean; coverageDays: number; missing: string[] };
@@ -12,7 +14,7 @@ async function checkReadiness(): Promise<Check> {
   const date = getCurrentChallengeDate();
   const [catalogResult, databaseResult] = await Promise.allSettled([
     readRuntimeCatalog(),
-    withPrisma(prisma => prisma.dailyAggregate.findFirst({ select: { id: true } })),
+    withPrisma(prisma => readDailyStatistics(prisma, date, CATEGORIES[0].id)),
   ]);
   const missing = catalogResult.status === "fulfilled" ? missingCatalogCoverage(catalogResult.value, date) : [];
   const catalog = catalogResult.status === "fulfilled";

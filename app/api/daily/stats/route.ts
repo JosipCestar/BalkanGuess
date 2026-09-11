@@ -10,22 +10,14 @@ import { proofMatches, verifyGameProof } from "@/lib/game-proof";
 import { HttpProblem, readJsonBody } from "@/lib/http";
 import { requestPlayerId } from "@/lib/player";
 import { enforceActorAndIpRateLimits, enforceRateLimit } from "@/lib/rate-limit";
+import { readDailyStatistics, recordDailyResult } from "@/lib/daily-stats-db";
 
 const STATS_CACHE_MS = 30_000;
 type Stats = ReturnType<typeof summarizeDailyResults>;
 const statsCache = new Map<string, { expiresAt: number; request: Promise<Stats> }>();
 
 async function getStats(prisma: PrismaClient | Prisma.TransactionClient, date: string, category: Category) {
-  const groups = await prisma.dailyAggregate.findMany({
-    where: { date, category },
-    select: { won: true, attempt: true, count: true },
-  });
-
-  return summarizeDailyResults(groups.map(group => ({
-    won: group.won,
-    attempt: group.attempt,
-    count: group.count,
-  })));
+  return summarizeDailyResults(await readDailyStatistics(prisma, date, category));
 }
 function readCachedStats(date: string, category: Category) {
   const key = `${date}:${category}`;
@@ -73,22 +65,10 @@ export async function POST(request: NextRequest) {
     if (localMode()) return response({ ...summarizeDailyResults([]), development: true });
     const { date, category, won, attempt } = proof;
     const playerHash = createHash("sha256").update(playerId).digest("hex");
-    const statistics = await withPrisma(async prisma => {
-      return prisma.$transaction(async transaction => {
-        const inserted = await transaction.dailyResult.createMany({
-          data: [{ date, category, playerHash, won, attempt }],
-          skipDuplicates: true,
-        });
-        if (inserted.count) {
-          await transaction.dailyAggregate.upsert({
-            where: { date_category_won_attempt: { date, category, won, attempt } },
-            update: { count: { increment: 1 } },
-            create: { date, category, won, attempt, count: 1 },
-          });
-        }
-        return getStats(transaction, date, category);
-      });
-    });
+    const statistics = summarizeDailyResults(await withPrisma(prisma => recordDailyResult(
+      prisma,
+      { date, category, playerHash, won, attempt },
+    )));
 
     cacheStats(date, category, statistics);
     return NextResponse.json(statistics, { headers: { "Cache-Control": "private, no-store" } });

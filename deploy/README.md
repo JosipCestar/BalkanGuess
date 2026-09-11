@@ -7,9 +7,19 @@ The production layout uses Cloudflare Workers for the Next.js site and API route
 In the Supabase project, open **Connect** and copy both pooler URLs:
 
 - **Session pooler**, port 5432: add this to GitHub as `SUPABASE_DATABASE_URL`. The daily job uses it for Prisma migrations.
-- **Transaction pooler**, port 6543: add this later as the Cloudflare Worker secret `DATABASE_URL`. Copy the complete URL shown by Supabase.
+- **Transaction pooler**, port 6543: the role-provisioning command converts this into a least-privilege Worker URL.
 
 Replace the password placeholder with the URL-encoded database password. Keep both URLs secret. The session pooler value already added to GitHub is the correct value for the daily job.
+
+The migration creates a no-login `balkanguess_runtime` permission role. Production uses a separate login that inherits it and can execute only the two statistics functions; it cannot read player hashes, mutate catalog tables, run migrations, create roles/databases, or bypass RLS. Raw player hashes are pruned after 35 days while aggregate statistics are retained.
+
+For the initial least-privilege rollout, apply migrations and deploy the application code while the Worker still has its existing administrative URL. Then run the command below with the administrative session-pooler URL in local `DATABASE_URL`. It creates and verifies `balkanguess_worker`, generates a password only in memory, and switches the Cloudflare secret without printing or saving it:
+
+```powershell
+npm run db:provision-runtime -- --switch-cloudflare
+```
+
+The command refuses to overwrite an existing Worker login, preventing an accidental uncoordinated password rotation.
 
 ## 2. Cloudflare R2
 

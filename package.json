@@ -16,6 +16,8 @@
     "db:migrate": "node node_modules/prisma/build/index.js migrate dev",
     "db:deploy": "node node_modules/prisma/build/index.js migrate deploy",
     "db:seed": "node node_modules/tsx/dist/cli.mjs prisma/seed.ts",
+    "db:prune-results": "node node_modules/tsx/dist/cli.mjs scripts/prune-daily-results.ts",
+    "db:provision-runtime": "node node_modules/tsx/dist/cli.mjs scripts/provision-runtime-role.ts",
     "dev:playlist": "tsx scripts/dev-playlist.ts",
     "playlist": "tsx scripts/playlist.ts",
     "dev:cloudflare": "vinext dev --port 3001",
@@ -61,6 +63,7 @@
     "wrangler": "^4.130.0"
   },
   "overrides": {
+    "deepmerge-ts": "8.0.1",
     "miniflare": {
       "sharp": "0.35.4"
     }

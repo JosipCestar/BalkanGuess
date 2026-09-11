@@ -11,6 +11,7 @@ import { readJsonBody } from "../lib/http";
 import { signPlayerId, verifyPlayerCookie } from "../lib/player";
 import { validateCatalog } from "../lib/catalog";
 import { missingCatalogCoverage } from "../lib/readiness";
+import { dailyResultRetentionCutoff } from "../lib/result-retention";
 describe("Balkan text normalization", () => { it("normalizes diacritics and punctuation", () => { expect(normalizeBalkanText(" Željko Joksimović ")).toBe("zeljko joksimovic"); expect(normalizeBalkanText("Đurđevdan")).toBe("djurdjevdan"); }); });
 describe("artist credit matching", () => {
   it("parses the collaboration styles used by the song catalog", () => {
@@ -99,5 +100,10 @@ describe("catalog validation and readiness", () => {
     const catalog = validateCatalog({ songs: [song], days: { "2026-09-11:club-mix": 1, "2026-09-11:jala-buba": 1, "2026-09-11:exyu": 1 } });
     expect(missingCatalogCoverage(catalog, "2026-09-11", 1)).toEqual([]);
     expect(missingCatalogCoverage(catalog, "2026-09-11", 2)).toHaveLength(3);
+  });
+});
+describe("anonymous result retention", () => {
+  it("keeps a bounded raw deduplication window", () => {
+    expect(dailyResultRetentionCutoff(new Date("2026-09-11T12:00:00.000Z"))).toBe("2026-08-07");
   });
 });

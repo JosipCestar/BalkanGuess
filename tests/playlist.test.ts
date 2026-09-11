@@ -8,11 +8,13 @@ describe("playlist import", () => {
   });
   it("only accepts YouTube playlist URLs", () => {
     expect(playlistUrl("https://www.youtube.com/playlist?list=PLVQZG1Rymm4U&extra=1")).toBe("https://www.youtube.com/playlist?list=PLVQZG1Rymm4U");
+    expect(playlistUrl("https://music.youtube.com/playlist?list=PLX9fzSi3XuA4")).toBe("https://www.youtube.com/playlist?list=PLX9fzSi3XuA4");
     expect(() => playlistUrl("https://evil.example/playlist?list=abc")).toThrow();
     expect(() => playlistUrl("file:///etc/passwd")).toThrow();
   });
   it("validates category boundaries", () => {
     expect(categoryFrom("club-mix")).toBe("club-mix");
+    expect(categoryFrom("trap")).toBe("trap");
     expect(categoryFrom(undefined)).toBe("club-mix");
     expect(() => categoryFrom("../clips")).toThrow();
   });

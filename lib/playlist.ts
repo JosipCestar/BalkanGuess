@@ -1,6 +1,6 @@
 export function playlistUrl(value: string) {
   const url = new URL(value);
-  if (!["www.youtube.com", "youtube.com"].includes(url.hostname) || url.protocol !== "https:" || url.pathname !== "/playlist" || !/^[\w-]+$/.test(url.searchParams.get("list") || "")) throw new Error("Provide an HTTPS YouTube playlist URL.");
+  if (!["www.youtube.com", "youtube.com", "music.youtube.com"].includes(url.hostname) || url.protocol !== "https:" || url.pathname !== "/playlist" || !/^[\w-]+$/.test(url.searchParams.get("list") || "")) throw new Error("Provide an HTTPS YouTube or YouTube Music playlist URL.");
   return `https://www.youtube.com/playlist?list=${url.searchParams.get("list")}`;
 }
 export function parseTrackTitle(value: string) {

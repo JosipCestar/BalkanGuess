@@ -1,4 +1,5 @@
 export {};
+import { CATEGORIES } from "../lib/categories";
 
 const rawBaseUrl = process.argv[2] || process.env.PRODUCTION_URL;
 if (!rawBaseUrl) throw new Error("Usage: npm run smoke:production -- https://your-worker.example");
@@ -25,12 +26,17 @@ if (JSON.parse(health.body).status !== "ok") throw new Error("Liveness check ret
 const readiness = await get("/api/readiness");
 if (JSON.parse(readiness.body).status !== "ok") throw new Error("Readiness check returned an unexpected response.");
 
-for (const category of ["club-mix", "jala-buba", "exyu"]) {
-  const daily = await get(`/api/daily?category=${category}`);
+const skipped: string[] = [];
+let checked = 0;
+for (const category of CATEGORIES) {
+  const daily = await get(`/api/daily?category=${category.id}`);
   const challenge = JSON.parse(daily.body) as { ready?: boolean; date?: string; audioUrl?: string };
-  if (!challenge.ready || !challenge.date || !challenge.audioUrl) throw new Error(`${category} is not ready.`);
-  await get(`/api/daily/stats?category=${category}&date=${challenge.date}`);
+  if (!challenge.ready && !category.required) { skipped.push(category.id); continue; }
+  if (!challenge.ready || !challenge.date || !challenge.audioUrl) throw new Error(`${category.id} is not ready.`);
+  checked += 1;
+  await get(`/api/daily/stats?category=${category.id}&date=${challenge.date}`);
   await requireByteRange(challenge.audioUrl);
 }
 
-console.log(`Production smoke checks passed for ${baseUrl.origin}.`);
+if (!checked) throw new Error("No prepared categories were available.");
+console.log(`Production smoke checks passed for ${baseUrl.origin}.${skipped.length ? ` Awaiting content: ${skipped.join(", ")}.` : ""}`);

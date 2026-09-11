@@ -91,15 +91,22 @@ describe("snippet boundaries", () => {
   });
 });
 describe("catalog validation and readiness", () => {
-  const song = { id: 1, title: "Song", artist: "Artist", categories: ["club-mix", "jala-buba", "exyu"], sourceUrl: null, clipKey: "clip.mp3", previewStart: 0, soundcloudTrackId: null, soundcloudUrl: null, active: true };
+  const song = { id: 1, title: "Song", artist: "Artist", categories: ["club-mix", "jala-buba", "exyu", "trap"], sourceUrl: null, clipKey: "clip.mp3", previewStart: 0, soundcloudTrackId: null, soundcloudUrl: null, active: true };
   it("rejects invalid clip keys and dangling assignments", () => {
     expect(() => validateCatalog({ songs: [{ ...song, clipKey: "../clip.mp3" }], days: {} })).toThrow();
     expect(() => validateCatalog({ songs: [song], days: { "2026-09-11:club-mix": 2 } })).toThrow();
   });
   it("reports missing category coverage", () => {
-    const catalog = validateCatalog({ songs: [song], days: { "2026-09-11:club-mix": 1, "2026-09-11:jala-buba": 1, "2026-09-11:exyu": 1 } });
+    const catalog = validateCatalog({ songs: [song], days: { "2026-09-11:club-mix": 1, "2026-09-11:jala-buba": 1, "2026-09-11:exyu": 1, "2026-09-11:trap": 1 } });
     expect(missingCatalogCoverage(catalog, "2026-09-11", 1)).toEqual([]);
-    expect(missingCatalogCoverage(catalog, "2026-09-11", 2)).toHaveLength(3);
+    expect(missingCatalogCoverage(catalog, "2026-09-11", 2)).toHaveLength(4);
+  });
+  it("does not mark a category live until its first song is imported", () => {
+    const onlyClubMix = validateCatalog({ songs: [{ ...song, categories: ["club-mix"] }], days: { "2026-09-11:club-mix": 1 } });
+    expect(missingCatalogCoverage(onlyClubMix, "2026-09-11", 1)).toEqual([
+      "2026-09-11:jala-buba",
+      "2026-09-11:exyu",
+    ]);
   });
 });
 describe("anonymous result retention", () => {

@@ -10,9 +10,11 @@ function dateOffset(date: string, days: number) {
 
 export function missingCatalogCoverage(catalog: Catalog, startDate: string, days = REQUIRED_COVERAGE_DAYS) {
   const missing: string[] = [];
+  const enabledCategories = CATEGORIES.filter(category => category.required
+    || catalog.songs.some(song => song.active && song.categories.includes(category.id)));
   for (let offset = 0; offset < days; offset++) {
     const date = dateOffset(startDate, offset);
-    for (const category of CATEGORIES) if (!dailySongFromCatalog(catalog, date, category.id)) missing.push(`${date}:${category.id}`);
+    for (const category of enabledCategories) if (!dailySongFromCatalog(catalog, date, category.id)) missing.push(`${date}:${category.id}`);
   }
   return missing;
 }

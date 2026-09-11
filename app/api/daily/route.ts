@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { challengeNumber, getCurrentChallengeDate } from "@/lib/challenge";
-import { categoryOrNull, CATEGORIES } from "@/lib/categories";
+import { categoryOrNull } from "@/lib/categories";
 import { getDailySong } from "@/lib/daily";
 import { localMode } from "@/lib/runtime";
 import { getOrCreatePlayer, setPlayerCookie } from "@/lib/player";
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const { playerId, isNew } = getOrCreatePlayer(request);
     const proof = signGameProof({ v: 1, playerId, date, category, attempt: 0, completed: false, won: false });
     const audioUrl = song ? `/api/daily/clip?category=${category}&date=${date}&v=${encodeURIComponent(song.clipKey!)}` : null;
-    const response = NextResponse.json({ challengeNumber: challengeNumber(date), date, category, categories: CATEGORIES, ready: !!song, development: localMode(), attempts: 6, proof, audioUrl }, { headers: { "Cache-Control": "private, no-store" } });
+    const response = NextResponse.json({ challengeNumber: challengeNumber(date), date, category, ready: !!song, development: localMode(), attempts: 6, proof, audioUrl }, { headers: { "Cache-Control": "private, no-store" } });
     if (isNew) setPlayerCookie(response, playerId, request.nextUrl.protocol === "https:");
     return response;
   } catch (error) {

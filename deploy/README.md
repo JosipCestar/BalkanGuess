@@ -103,7 +103,7 @@ Before deploying this version over an existing installation, run the **Prepare d
 Before replacing an existing public URL, verify:
 
 - `/api/health` returns `{ "status": "ok" }`, and `/api/readiness` returns HTTP 200 with all checks true.
-- `/api/daily?category=club-mix`, `jala-buba`, and `exyu` each report a prepared challenge.
+- `/api/daily?category=club-mix`, `jala-buba`, `exyu`, and `trap` each report a prepared challenge.
 - Each category plays audio, accepts a guess, reveals the answer, and restores browser progress after reload.
 - `/api/daily/clip` serves only today's assigned private clip and supports browser range requests.
 - A second manual daily workflow run succeeds without replacing prepared assignments or rewriting an unchanged catalog.
@@ -119,5 +119,7 @@ The `Monitor production readiness` workflow also checks `/api/readiness` every 3
 ## Maintenance
 
 Add tracks to the source YouTube playlists and let the next workflow import them. For a bad automatic intro boundary, run `npm run playlist -- start SONG_ID SECONDS` in a configured worker environment, followed by `prepare`. The optional `publish` command maintains a PostgreSQL catalog mirror, but production does not read that mirror and the scheduled workflow deliberately skips it.
+
+Playlist imports accept both `youtube.com` and `music.youtube.com` playlist links. YouTube Music extraction currently resolves through the equivalent standard YouTube playlist, so playlists must be public or unlisted and accessible without an interactive account session on the runner.
 
 Prepared clips remain in R2 so old assignments and reused songs keep working. Back up `state/catalog.json` from R2 and the Supabase database together before manually repairing catalog data.

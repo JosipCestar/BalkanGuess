@@ -47,21 +47,19 @@ async function workerClip(clipKey: string, rangeHeader: string | null) {
   const { env } = await import("cloudflare:workers");
   const key = `clips/${clipKey}`;
   if (rangeHeader) {
-    const metadata = await env.AUDIO_BUCKET.head(key);
-    if (!metadata) return new Response(null, { status: 404 });
-    const range = parseRange(rangeHeader, metadata.size);
-    if (!range) return new Response(null, { status: 416, headers: { "Accept-Ranges": "bytes", "Content-Range": `bytes */${metadata.size}` } });
-    const object = await env.AUDIO_BUCKET.get(key, { range: { offset: range.start, length: range.end - range.start + 1 } });
+    const object = await env.AUDIO_BUCKET.get(key, { range: new Headers({ Range: rangeHeader }) });
     if (!object) return new Response(null, { status: 404 });
-    const headers = audioHeaders(range.end - range.start + 1, "private, max-age=3600");
-    headers.set("Content-Range", `bytes ${range.start}-${range.end}/${metadata.size}`);
+    const range = parseRange(rangeHeader, object.size);
+    if (!range) return new Response(null, { status: 416, headers: { "Accept-Ranges": "bytes", "Content-Range": `bytes */${object.size}` } });
+    const headers = audioHeaders(range.end - range.start + 1, "private, max-age=86400, immutable");
+    headers.set("Content-Range", `bytes ${range.start}-${range.end}/${object.size}`);
     headers.set("ETag", object.httpEtag);
     headers.set("Last-Modified", object.uploaded.toUTCString());
     return new Response(object.body, { status: 206, headers });
   }
   const object = await env.AUDIO_BUCKET.get(key);
   if (!object) return new Response(null, { status: 404 });
-  const headers = audioHeaders(object.size, "private, max-age=3600");
+  const headers = audioHeaders(object.size, "private, max-age=86400, immutable");
   headers.set("ETag", object.httpEtag);
   headers.set("Last-Modified", object.uploaded.toUTCString());
   return new Response(object.body, { headers });

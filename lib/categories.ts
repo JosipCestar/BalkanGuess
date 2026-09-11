@@ -1,7 +1,8 @@
 export const CATEGORIES = [
-  { id: "club-mix", label: "Balkan Club Mix" },
-  { id: "jala-buba", label: "Jala i Buba" },
-  { id: "exyu", label: "EXYU" },
+  { id: "club-mix", label: "Balkan Club Mix", required: true },
+  { id: "jala-buba", label: "Jala i Buba", required: true },
+  { id: "exyu", label: "EXYU", required: true },
+  { id: "trap", label: "Trap", required: false },
 ] as const;
 export type Category = typeof CATEGORIES[number]["id"];
 export function categoryOrNull(value: unknown): Category | null {

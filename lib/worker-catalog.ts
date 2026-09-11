@@ -1,6 +1,8 @@
 import { validateCatalog, type Catalog } from "./catalog";
 
-const CATALOG_CACHE_MS = 60_000;
+// Assignments are prepared days ahead and normally change once per day. A longer
+// per-isolate cache cuts repeated R2 reads while keeping manual repairs responsive.
+const CATALOG_CACHE_MS = 5 * 60_000;
 let cachedCatalog: { value: Catalog; expiresAt: number } | undefined;
 let catalogRequest: Promise<Catalog> | undefined;
 

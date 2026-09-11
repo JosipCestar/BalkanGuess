@@ -7,6 +7,8 @@ import { CATEGORIES, type Category } from "@/lib/categories";
 import { DURATIONS, scoreForAttempt } from "@/lib/game";
 import type { DailyStats } from "@/lib/daily-stats";
 import { NextSongCountdown, PersonalStats } from "./PersonalStats";
+import { nextZagrebMidnight } from "@/lib/personal-stats";
+import { getCurrentChallengeDate } from "@/lib/challenge";
 
 type Song = { id: number; artist: string; title: string };
 type Answer = { artist: string; title: string; sourceUrl?: string | null; soundcloudUrl?: string | null };
@@ -25,7 +27,6 @@ type Saved = {
 };
 
 const empty: Saved = { attempt: 0, guesses: [], entries: [], completed: false, won: false };
-let dailyRequestQueue: Promise<void> = Promise.resolve();
 const dailyRequests = new Map<Category, { expiresAt: number; request: Promise<DailyResponse> }>();
 
 function proofIdentity(token: unknown) {
@@ -63,14 +64,17 @@ function restoreSaved(raw: string | null, freshProof: string, date: string, cate
 function loadDaily(category: Category) {
   const cached = dailyRequests.get(category);
   if (cached && cached.expiresAt > Date.now()) return cached.request;
-  const request = dailyRequestQueue.then(async () => {
+  const request = (async () => {
     const response = await fetch(`/api/daily?category=${category}`);
     const data = await response.json() as DailyResponse;
     if (!response.ok || data.error) throw new Error(data.error || "Could not load today's challenge.");
     return data;
-  });
-  dailyRequestQueue = request.then(() => undefined, () => undefined);
-  dailyRequests.set(category, { expiresAt: Date.now() + 5_000, request });
+  })();
+  const entry = { expiresAt: nextZagrebMidnight(new Date()), request };
+  dailyRequests.set(category, entry);
+  void request.then(data => {
+    if (getCurrentChallengeDate() > data.date && dailyRequests.get(category) === entry) dailyRequests.delete(category);
+  }, () => undefined);
   void request.catch(() => dailyRequests.delete(category));
   return request;
 }
@@ -241,11 +245,10 @@ function CategoryGame({ category }: { category: Category }) {
   }, [date, game.completed, game.answer, game.attempt, game.proof, category, initialProof]);
 
   useEffect(() => {
-    if (!date || game.attempt === 0) return;
+    if (!date || !game.completed || !game.answer || !game.proof) return;
     const controller = new AbortController();
-    const completedResult = game.completed && Boolean(game.answer) && Boolean(game.proof);
     const reportKey = `balkanguess:reported:v1:${category}:${date}`;
-    const shouldSubmit = completedResult && localStorage.getItem(reportKey) !== game.proof;
+    const shouldSubmit = localStorage.getItem(reportKey) !== game.proof;
     setStatsLoading(true);
     fetch(shouldSubmit ? "/api/daily/stats" : `/api/daily/stats?category=${category}&date=${date}`, {
       method: shouldSubmit ? "POST" : "GET",

@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { putR2Object, readR2Text, remoteCatalogEnabled } from "./r2";
+import { CATEGORIES } from "./categories";
 export type CatalogSong = {
   id: number; title: string; artist: string; categories: string[];
   sourceUrl: string | null; clipKey: string | null; previewStart: number;
@@ -9,8 +10,8 @@ export type CatalogSong = {
 };
 export type Catalog = { songs: CatalogSong[]; days: Record<string, number> };
 const CLIP_KEY = /^[a-zA-Z0-9_-]+\.mp3$/;
-const DAY_KEY = /^\d{4}-\d{2}-\d{2}:(?:legacy|club-mix|jala-buba|exyu)$/;
-const CATALOG_CATEGORIES = new Set(["legacy", "club-mix", "jala-buba", "exyu"]);
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+const CATALOG_CATEGORIES = new Set(["legacy", ...CATEGORIES.map(category => category.id)]);
 
 function nullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
@@ -41,7 +42,9 @@ export function validateCatalog(value: unknown): Catalog {
 
   const days: Record<string, number> = {};
   for (const [key, rawId] of Object.entries(candidate.days as Record<string, unknown>)) {
-    if (!DAY_KEY.test(key) || !Number.isInteger(rawId) || !ids.has(Number(rawId))) throw new Error(`Catalog assignment ${key} is invalid.`);
+    const [date, category, extra] = key.split(":");
+    if (extra !== undefined || !DATE_KEY.test(date) || !CATALOG_CATEGORIES.has(category)
+      || !Number.isInteger(rawId) || !ids.has(Number(rawId))) throw new Error(`Catalog assignment ${key} is invalid.`);
     days[key] = Number(rawId);
   }
   return { songs, days };

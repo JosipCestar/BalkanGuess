@@ -58,8 +58,7 @@ export function PersonalStats({ category, date, development, result }: {
     refresh();
     window.addEventListener("storage", refresh);
     window.addEventListener("focus", refresh);
-    const timer = setInterval(refresh, 60000);
-    return () => { window.removeEventListener("storage", refresh); window.removeEventListener("focus", refresh); clearInterval(timer); };
+    return () => { window.removeEventListener("storage", refresh); window.removeEventListener("focus", refresh); };
   }, [prefix, resultDate, won, attempt, development]);
   const open = () => { setActiveCategory(category); setClosing(false); dialog.current?.showModal(); };
   const close = () => {
